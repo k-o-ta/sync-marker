@@ -1,3 +1,8 @@
+#[macro_use]
+extern crate actix;
+
+use actix::*;
+
 use actix_web::{web, App, Error, HttpResponse, HttpServer, Responder};
 use futures::future::Future;
 use std::sync::Arc;
@@ -10,6 +15,8 @@ use juniper::http::GraphQLRequest;
 
 mod schema;
 use crate::schema::{create_schema, Schema};
+
+mod bookshelf;
 
 fn graphiql() -> HttpResponse {
     let html = graphiql_source("http://127.0.0.1:8080/graphql");
@@ -35,6 +42,8 @@ fn index() -> impl Responder {
 fn main() {
     // std::env::set_var("RUST_LOG", "actix_web=info");
     // env_logger::init();
+    // let addr = bookshelf::Bookshelf.new().start();
+    let addr = bookshelf::Bookshelf::new().start();
     let schema = std::sync::Arc::new(create_schema());
     HttpServer::new(move || {
         App::new()
