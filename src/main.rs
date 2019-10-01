@@ -28,7 +28,8 @@ fn graphql(
     data: web::Json<GraphQLRequest>,
 ) -> impl Future<Item = HttpResponse, Error = Error> {
     web::block(move || {
-        let res = data.execute(&st, &());
+        let ctx = schema::Context {};
+        let res = data.execute(&st, &ctx);
         Ok::<_, serde_json::error::Error>(serde_json::to_string(&res)?)
     })
     .map_err(Error::from)
@@ -40,9 +41,8 @@ fn index() -> impl Responder {
 }
 
 fn main() {
-    // std::env::set_var("RUST_LOG", "actix_web=info");
-    // env_logger::init();
-    // let addr = bookshelf::Bookshelf.new().start();
+    let sys = actix::System::new("sync-marker");
+
     let addr = bookshelf::Bookshelf::new().start();
     let schema = std::sync::Arc::new(create_schema());
     HttpServer::new(move || {
