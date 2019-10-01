@@ -24,12 +24,14 @@ fn graphiql() -> HttpResponse {
 }
 
 fn graphql(
-    st: web::Data<Arc<Schema>>,
+    // st: web::Data<Arc<Schema>>,
+    state: web::Data<State>,
     data: web::Json<GraphQLRequest>,
 ) -> impl Future<Item = HttpResponse, Error = Error> {
     web::block(move || {
         let ctx = schema::Context {};
-        let res = data.execute(&st, &ctx);
+        // let res = data.execute(&st, &ctx);
+        let res = data.execute(&(state.schema), &ctx);
         Ok::<_, serde_json::error::Error>(serde_json::to_string(&res)?)
     })
     .map_err(Error::from)
@@ -40,14 +42,27 @@ fn index() -> impl Responder {
     HttpResponse::Ok().body("Hello world!")
 }
 
+struct State {
+    schema: Arc<Schema>,
+    addr: actix::Addr<bookshelf::Bookshelf>,
+}
+
 fn main() {
     let sys = actix::System::new("sync-marker");
 
     let addr = bookshelf::Bookshelf::new().start();
     let schema = std::sync::Arc::new(create_schema());
+    // let state = State {
+    //     schema: schema.clone(),
+    //     addr: addr.clone(),
+    // };
     HttpServer::new(move || {
         App::new()
-            .data(schema.clone())
+            // .data(schema.clone())
+            .data(State {
+                schema: schema.clone(),
+                addr: addr.clone(),
+            })
             .service(web::resource("/graphql").route(web::post().to_async(graphql)))
             .service(web::resource("/graphiql").route(web::get().to(graphiql)))
             .route("/", web::get().to(index))

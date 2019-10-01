@@ -1,9 +1,9 @@
-use juniper;
+use actix::Addr;
 use juniper::FieldResult;
 use juniper::RootNode;
 
 pub struct Context {
-    // pool: i32,
+    // addr: Addr<super::bookshelf::Bookshelf>,
 }
 impl juniper::Context for Context {}
 
