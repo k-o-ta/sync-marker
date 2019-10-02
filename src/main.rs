@@ -29,10 +29,22 @@ fn graphql(
     data: web::Json<GraphQLRequest>,
 ) -> impl Future<Item = HttpResponse, Error = Error> {
     web::block(move || {
-        let ctx = schema::Context {};
+        return match state.get_ref() {
+            State { schema, addr } => {
+                let ctx = schema::Context { addr: addr.clone() };
+                let res = data.execute(&schema, &ctx);
+                Ok::<_, serde_json::error::Error>(serde_json::to_string(&res)?)
+            }
+        };
+        // let (schema, addr) = state;
+        // let ctx = schema::Context { addr };
+        // let ctx = schema::Context {
+        //     addr: state.addr.clone(),
+        // };
         // let res = data.execute(&st, &ctx);
-        let res = data.execute(&(state.schema), &ctx);
-        Ok::<_, serde_json::error::Error>(serde_json::to_string(&res)?)
+        // let res = data.execute(&(state.schema), &ctx);
+        // let res = data.execute(&schema, &ctx);
+        // Ok::<_, serde_json::error::Error>(serde_json::to_string(&res)?)
     })
     .map_err(Error::from)
     .and_then(|user| Ok(HttpResponse::Ok().content_type("application/json").body(user)))
@@ -47,7 +59,7 @@ struct State {
     addr: actix::Addr<bookshelf::Bookshelf>,
 }
 
-fn main() {
+fn main() -> std::io::Result<()> {
     let sys = actix::System::new("sync-marker");
 
     let addr = bookshelf::Bookshelf::new().start();
@@ -67,8 +79,7 @@ fn main() {
             .service(web::resource("/graphiql").route(web::get().to(graphiql)))
             .route("/", web::get().to(index))
     })
-    .bind("127.0.0.1:8080")
-    .unwrap()
-    .run()
-    .unwrap()
+    .bind("127.0.0.1:8080")?
+    .start();
+    sys.run()
 }
