@@ -1,3 +1,4 @@
+use super::bookshelf::Isbn as IsbnDigits;
 use actix::prelude::*;
 use actix::Addr;
 use futures::Future;
@@ -5,7 +6,7 @@ use juniper::FieldResult;
 use juniper::RootNode;
 
 pub struct Context {
-    pub addr: Addr<super::bookshelf::Bookshelf>,
+    pub addr: Addr<super::bookshelf::BookRepository>,
 }
 impl juniper::Context for Context {}
 
@@ -17,12 +18,34 @@ impl juniper::Context for Context {}
 //     page_in_progress: Option<i32>,
 // }
 
+#[derive(GraphQLObject)]
+pub struct Isbn {
+    code: String,
+}
+
+impl From<IsbnDigits> for Isbn {
+    fn from(isbn: IsbnDigits) -> Self {
+        Isbn {
+            code: isbn.code().to_string(),
+        }
+    }
+}
+
 pub struct Query;
 
 #[juniper::object(
     Context = Context,
 )]
 impl Query {
+    // fn book_from_isbn(context: &Context, isbn: String) -> FieldResult<super::bookshelf::Book> {
+    //      match isbn.parse::<u64>() {
+    //          Ok(code) => {},
+    //          Err(err) =>{}
+    //
+    //      }
+    //     let isbn = IsbnDigits::
+    //
+    // }
     fn books(context: &Context, user_id: String) -> FieldResult<Vec<super::bookshelf::Book>> {
         let res_future = context.addr.send(super::bookshelf::Search(user_id));
         let res = res_future.wait();

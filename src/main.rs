@@ -56,13 +56,13 @@ fn index() -> impl Responder {
 
 struct State {
     schema: Arc<Schema>,
-    addr: actix::Addr<bookshelf::Bookshelf>,
+    addr: actix::Addr<bookshelf::BookRepository>,
 }
 
 fn main() -> std::io::Result<()> {
     let sys = actix::System::new("sync-marker");
 
-    let addr = bookshelf::Bookshelf::new().start();
+    let addr = bookshelf::BookRepository::new().start();
     let schema = std::sync::Arc::new(create_schema());
     // let state = State {
     //     schema: schema.clone(),

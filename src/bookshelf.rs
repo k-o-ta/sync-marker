@@ -1,3 +1,4 @@
+use super::schema::Isbn as graphqlIsbn;
 use actix::prelude::*;
 use std::io;
 
@@ -9,9 +10,25 @@ pub struct Book {
     page_in_progress: Option<i32>,
 }
 
-pub struct Bookshelf(pub Vec<Book>);
+pub enum IsbnError {
+    RangeError,
+}
+pub struct Isbn(u64);
+impl Isbn {
+    pub fn new(isbn: u64) -> Result<Self, IsbnError> {
+        if !(9780000000000..=9799999999999).contains(&isbn) {
+            return Err(IsbnError::RangeError);
+        }
+        Ok(Isbn(isbn))
+    }
+    pub fn code(&self) -> u64 {
+        self.0
+    }
+}
 
-impl Actor for Bookshelf {
+pub struct BookRepository(pub Vec<Book>);
+
+impl Actor for BookRepository {
     type Context = Context<Self>;
     fn started(&mut self, ctx: &mut Context<Self>) {
         println!("Actor is alive");
@@ -26,7 +43,7 @@ impl Message for Add {
     type Result = Result<bool, io::Error>;
 }
 
-impl Handler<Add> for Bookshelf {
+impl Handler<Add> for BookRepository {
     type Result = Result<bool, io::Error>;
     fn handle(&mut self, msg: Add, _ctx: &mut Context<Self>) -> Self::Result {
         println!("hadle Add");
@@ -39,7 +56,7 @@ pub struct Search(pub String);
 impl Message for Search {
     type Result = Result<Vec<Book>, io::Error>;
 }
-impl Handler<Search> for Bookshelf {
+impl Handler<Search> for BookRepository {
     type Result = Result<Vec<Book>, io::Error>;
     fn handle(&mut self, msg: Search, _: &mut Context<Self>) -> Self::Result {
         Ok(self.search(msg.0))
@@ -50,16 +67,16 @@ pub struct Last;
 impl Message for Last {
     type Result = Option<Book>;
 }
-impl Handler<Last> for Bookshelf {
+impl Handler<Last> for BookRepository {
     type Result = Option<Book>;
     fn handle(&mut self, msg: Last, _: &mut Context<Self>) -> Self::Result {
         self.last()
     }
 }
 
-impl Bookshelf {
+impl BookRepository {
     pub fn new() -> Self {
-        Bookshelf(vec![
+        BookRepository(vec![
             Book {
                 id: "1".to_owned(),
                 name: "a".to_owned(),
@@ -73,6 +90,15 @@ impl Bookshelf {
                 page_in_progress: Some(2),
             },
         ])
+    }
+    fn search_from_isbn(isbn: Isbn) -> Option<Book> {
+        // not lookup
+        Some(Book {
+            id: "100".to_string(),
+            name: "z".to_string(),
+            page: 100,
+            page_in_progress: None,
+        })
     }
     fn search(&self, id: String) -> Vec<Book> {
         self.0.clone()
