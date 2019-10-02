@@ -1,7 +1,9 @@
 use super::bookshelf::Isbn as IsbnDigits;
+use super::bookshelf::IsbnError;
 use actix::prelude::*;
 use actix::Addr;
 use futures::Future;
+use juniper::FieldError;
 use juniper::FieldResult;
 use juniper::RootNode;
 
@@ -37,15 +39,36 @@ pub struct Query;
     Context = Context,
 )]
 impl Query {
-    // fn book_from_isbn(context: &Context, isbn: String) -> FieldResult<super::bookshelf::Book> {
-    //      match isbn.parse::<u64>() {
-    //          Ok(code) => {},
-    //          Err(err) =>{}
-    //
-    //      }
-    //     let isbn = IsbnDigits::
-    //
-    // }
+    fn book_from_isbn(context: &Context, isbn: String) -> FieldResult<super::bookshelf::Book> {
+        let isbn = match isbn.parse::<u64>() {
+            Ok(code) => match IsbnDigits::new(code) {
+                Ok(isbn) => isbn,
+                Err(IsbnError::RangeError) => {
+                    return Err(FieldError::new(
+                        "ISBN must be between 9780000000000 - 9799999999999",
+                        graphql_value!({"range_error": "ISBN range error"}),
+                    ))
+                }
+            },
+            Err(err) => {
+                return Err(FieldError::new(
+                    "ISBN must be 13 digit number",
+                    graphql_value!({"format_error": "ISBN parse error"}),
+                ))
+            }
+        };
+        match super::bookshelf::BookRepository::search_from_isbn(isbn) {
+            Some(book) => Ok(book),
+            None => {
+                return Err(FieldError::new(
+                    "no such book",
+                    graphql_value!({"not_found_error": "book not found"}),
+                ))
+            }
+        }
+        // let isbn = IsbnDigits::
+    }
+
     fn books(context: &Context, user_id: String) -> FieldResult<Vec<super::bookshelf::Book>> {
         let res_future = context.addr.send(super::bookshelf::Search(user_id));
         let res = res_future.wait();

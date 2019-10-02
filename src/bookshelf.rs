@@ -52,6 +52,17 @@ impl Handler<Add> for BookRepository {
     }
 }
 
+pub struct SearchFromIsbn(pub Isbn);
+impl Message for SearchFromIsbn {
+    type Result = Option<Book>;
+}
+impl Handler<SearchFromIsbn> for BookRepository {
+    type Result = Option<Book>;
+    fn handle(&mut self, msg: SearchFromIsbn, _: &mut Context<Self>) -> Self::Result {
+        super::bookshelf::BookRepository::search_from_isbn(msg.0)
+    }
+}
+
 pub struct Search(pub String);
 impl Message for Search {
     type Result = Result<Vec<Book>, io::Error>;
@@ -91,7 +102,7 @@ impl BookRepository {
             },
         ])
     }
-    fn search_from_isbn(isbn: Isbn) -> Option<Book> {
+    pub fn search_from_isbn(isbn: Isbn) -> Option<Book> {
         // not lookup
         Some(Book {
             id: "100".to_string(),
