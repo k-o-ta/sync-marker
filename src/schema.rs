@@ -43,9 +43,9 @@ impl Query {
         let isbn = match isbn.parse::<u64>() {
             Ok(code) => match IsbnDigits::new(code) {
                 Ok(isbn) => isbn,
-                Err(IsbnError::RangeError) => {
+                Err(err) => {
                     return Err(FieldError::new(
-                        "ISBN must be between 9780000000000 - 9799999999999",
+                        err,
                         graphql_value!({"range_error": "ISBN range error"}),
                     ))
                 }

@@ -1,5 +1,6 @@
 use super::schema::Isbn as graphqlIsbn;
 use actix::prelude::*;
+use failure::Error;
 use std::io;
 
 #[derive(GraphQLObject, Clone)]
@@ -10,14 +11,17 @@ pub struct Book {
     page_in_progress: Option<i32>,
 }
 
+#[derive(Fail, Debug)]
 pub enum IsbnError {
-    RangeError,
+    #[fail(display = "ISBN must be between 9780000000000 - 9799999999999: {}", _0)]
+    RangeError(u64),
 }
 pub struct Isbn(u64);
 impl Isbn {
-    pub fn new(isbn: u64) -> Result<Self, IsbnError> {
+    pub fn new(isbn: u64) -> Result<Self, Error> {
         if !(9780000000000..=9799999999999).contains(&isbn) {
-            return Err(IsbnError::RangeError);
+            // return Err(IsbnError::RangeError);
+            return Err(IsbnError::RangeError(isbn).into());
         }
         Ok(Isbn(isbn))
     }
