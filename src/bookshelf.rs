@@ -1,8 +1,28 @@
 use super::schema::Isbn as graphqlIsbn;
 use actix::prelude::*;
 use failure::Error;
+use reqwest::r#async::Client as AsyncClient;
+use reqwest::Url;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::io;
 
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct VolumeInfo {
+    title: String,
+    page_count: i32,
+}
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct Volume {
+    id: String,
+    volume_info: VolumeInfo,
+}
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Volumes {
+    items: Vec<Volume>,
+}
 #[derive(GraphQLObject, Clone)]
 pub struct Book {
     id: String,
@@ -108,6 +128,20 @@ impl BookRepository {
     }
     pub fn search_from_isbn(isbn: Isbn) -> Option<Book> {
         // not lookup
+        let client = AsyncClient::new();
+        let res = client
+            .get(Url::parse("https://www.googleapis.com/books/v1/volumes?q=isbn:9784797321944").unwrap())
+            .send();
+        let json = res.and_then(|mut result| result.json::<Volumes>());
+        let mut rt = tokio::runtime::current_thread::Runtime::new().expect("new rt");
+
+        let result = rt.block_on(json);
+        // let result = res.wait();
+        match result {
+            Ok(res) => println!("{:?}", res),
+            Err(e) => println!("{:?}", e),
+        }
+        // println!("{:?}", result);
         Some(Book {
             id: "100".to_string(),
             name: "z".to_string(),
