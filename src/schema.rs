@@ -1,6 +1,6 @@
 use super::bookshelf::Book as TBook;
 use super::bookshelf::Isbn as TIsbn;
-use super::bookshelf::{InMemoryBooksRepository, IsbnError};
+use super::bookshelf::{BookInfoLocation, InMemoryBooksRepository, IsbnError};
 use actix::prelude::*;
 use actix::Addr;
 use futures::Future;
@@ -33,28 +33,28 @@ pub struct Book {
     name: String,
     page: i32,
     isbn: Isbn,
+    data_source: String,
 }
-
-impl From<TBook> for Book {
-    fn from(item: TBook) -> Self {
+impl TBook {
+    fn into_graphql_book(self, data_source: String) -> Book {
         Book {
-            id: item.id,
-            name: item.name,
-            page: item.page,
-            isbn: Isbn::from(item.isbn),
+            id: self.id,
+            name: self.name,
+            page: self.page,
+            isbn: Isbn::from(self.isbn),
+            data_source,
         }
     }
 }
 
-// #[derive(GraphQLObject)]
-// pub struct Isbn {
-//     code: String,
-// }
+// impl From<TBook> for Book {
+//     fn from(item: TBook) -> Self {
+//         Book {
+//             id: item.id,
+//             name: item.name,
+//             page: item.page,
+//             isbn: Isbn::from(item.isbn),
 //
-// impl From<IsbnDigits> for Isbn {
-//     fn from(isbn: IsbnDigits) -> Self {
-//         Isbn {
-//             code: isbn.code().to_string(),
 //         }
 //     }
 // }
@@ -65,50 +65,37 @@ pub struct Query;
     Context = Context,
 )]
 impl Query {
-    fn book_from_isbn(context: &Context, isbn: String) -> FieldResult<Book> {
+    fn book_from_isbn(context: &Context, isbn: String) -> FieldResult<(Book)> {
+        println!("0");
+        dbg!("0");
         let isbn = TIsbn::try_from(isbn);
-        // return Ok(super::bookshelf::InMemoryBooksRepository::search_from_isbn(isbn.unwrap())
-        //     .unwrap()
-        //     .into());
-        match isbn {
-            Ok(isbn) => match InMemoryBooksRepository::search_from_isbn(isbn) {
-                Some(book) => Ok(book.into()),
-                None => Err(FieldError::new(
-                    "no such book",
-                    graphql_value!({"not_found_error": "book not found"}),
-                )),
-            },
-            Err(err) => Err(FieldError::new(
-                err.to_string(),
-                graphql_value!({"isbn_error": "isbn error"}),
-            )),
-        }
-        // let isbn = match isbn.parse::<u64>() {
-        //     Ok(code) => match TIsbn::new(code) {
-        //         Ok(isbn) => isbn,
-        //         Err(err) => {
-        //             return Err(FieldError::new(
-        //                 err,
-        //                 graphql_value!({"range_error": "ISBN range error"}),
-        //             ))
-        //         }
-        //     },
-        //     Err(err) => {
-        //         return Err(FieldError::new(
-        //             "ISBN must be 13 digit number",
-        //             graphql_value!({"format_error": "ISBN parse error"}),
-        //         ))
-        //     }
-        // };
-        // match super::bookshelf::InMemoryBooksRepository::search_from_isbn(isbn) {
-        //     Some(book) => Ok(book),
-        //     None => {
-        //         return Err(FieldError::new(
-        //             "no such book",
-        //             graphql_value!({"not_found_error": "book not found"}),
-        //         ))
-        //     }
-        // }
+        if let Ok(isbn) = isbn {
+            dbg!("1");
+            let res_future = context.addr.send(super::bookshelf::SearchFromIsbn(isbn));
+            let res = res_future.wait();
+            match res {
+                Ok(res) => match res {
+                    Ok(book_info) => return Ok(book_info.0.into_graphql_book(book_info.1.to_string())),
+                    Err(err) => {
+                        return Err(FieldError::new(
+                            err.to_string(),
+                            graphql_value!({"isbn_error": "isbn error"}),
+                        ))
+                    }
+                },
+                Err(err) => {
+                    return Err(FieldError::new(
+                        err.to_string(),
+                        graphql_value!({"isbn_error": "isbn error"}),
+                    ))
+                }
+            };
+        };
+        dbg!("10");
+        Err(FieldError::new(
+            "isbn error",
+            graphql_value!({"isbn_error": "isbn error"}),
+        ))
     }
 
     fn books(context: &Context, user_id: String) -> FieldResult<Vec<Book>> {
@@ -116,25 +103,14 @@ impl Query {
         let res = res_future.wait();
         match res {
             Ok(result) => match result {
-                Ok(result) => Ok(result.into_iter().map(|book| book.into()).collect()),
+                Ok(result) => Ok(result
+                    .into_iter()
+                    .map(|book| book.into_graphql_book(String::from(BookInfoLocation::InMemory.to_string())))
+                    .collect()),
                 Err(err) => panic!("{}", err),
             },
             Err(err) => panic!("{}", err),
         }
-        // Ok(vec![
-        //     Book {
-        //         id: "1".to_owned(),
-        //         name: "a".to_owned(),
-        //         page: 100,
-        //         page_in_progress: Some(1),
-        //     },
-        //     Book {
-        //         id: "2".to_owned(),
-        //         name: "b".to_owned(),
-        //         page: 200,
-        //         page_in_progress: Some(2),
-        //     },
-        // ])
     }
 }
 
@@ -160,7 +136,11 @@ impl Mutation {
             let res_last = context.addr.send(super::bookshelf::Last);
             let res = res_last.wait();
             match res {
-                Ok(result) => return Ok(result.expect("cannot fetch last book").into()),
+                Ok(result) => {
+                    return Ok(result
+                        .expect("cannot fetch last book")
+                        .into_graphql_book(BookInfoLocation::InMemory.to_string()))
+                }
                 Err(err) => panic!("{}", err),
             }
         };
