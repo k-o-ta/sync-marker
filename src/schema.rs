@@ -1,4 +1,5 @@
-use super::bookshelf::Isbn as IsbnDigits;
+use super::bookshelf::Book as TBook;
+use super::bookshelf::Isbn as TIsbn;
 use super::bookshelf::IsbnError;
 use actix::prelude::*;
 use actix::Addr;
@@ -6,32 +7,57 @@ use futures::Future;
 use juniper::FieldError;
 use juniper::FieldResult;
 use juniper::RootNode;
+use std::convert::TryFrom;
 
 pub struct Context {
     pub addr: Addr<super::bookshelf::BookRepository>,
 }
 impl juniper::Context for Context {}
 
-// #[derive(GraphQLObject)]
-// struct Book {
-//     id: String,
-//     name: String,
-//     page: i32,
-//     page_in_progress: Option<i32>,
-// }
-
-#[derive(GraphQLObject)]
+#[derive(GraphQLObject, Clone)]
 pub struct Isbn {
     code: String,
 }
 
-impl From<IsbnDigits> for Isbn {
-    fn from(isbn: IsbnDigits) -> Self {
+impl From<TIsbn> for Isbn {
+    fn from(value: TIsbn) -> Self {
         Isbn {
-            code: isbn.code().to_string(),
+            code: value.0.to_string(),
         }
     }
 }
+
+#[derive(GraphQLObject)]
+pub struct Book {
+    id: String,
+    name: String,
+    page: i32,
+    isbn: Isbn,
+}
+
+impl From<TBook> for Book {
+    fn from(item: TBook) -> Self {
+        Book {
+            id: item.id,
+            name: item.name,
+            page: item.page,
+            isbn: Isbn::from(item.isbn),
+        }
+    }
+}
+
+// #[derive(GraphQLObject)]
+// pub struct Isbn {
+//     code: String,
+// }
+//
+// impl From<IsbnDigits> for Isbn {
+//     fn from(isbn: IsbnDigits) -> Self {
+//         Isbn {
+//             code: isbn.code().to_string(),
+//         }
+//     }
+// }
 
 pub struct Query;
 
@@ -39,42 +65,58 @@ pub struct Query;
     Context = Context,
 )]
 impl Query {
-    fn book_from_isbn(context: &Context, isbn: String) -> FieldResult<super::bookshelf::Book> {
-        let isbn = match isbn.parse::<u64>() {
-            Ok(code) => match IsbnDigits::new(code) {
-                Ok(isbn) => isbn,
-                Err(err) => {
-                    return Err(FieldError::new(
-                        err,
-                        graphql_value!({"range_error": "ISBN range error"}),
-                    ))
-                }
-            },
-            Err(err) => {
-                return Err(FieldError::new(
-                    "ISBN must be 13 digit number",
-                    graphql_value!({"format_error": "ISBN parse error"}),
-                ))
-            }
-        };
-        match super::bookshelf::BookRepository::search_from_isbn(isbn) {
-            Some(book) => Ok(book),
-            None => {
-                return Err(FieldError::new(
+    fn book_from_isbn(context: &Context, isbn: String) -> FieldResult<Book> {
+        let isbn = TIsbn::try_from(isbn);
+        // return Ok(super::bookshelf::BookRepository::search_from_isbn(isbn.unwrap())
+        //     .unwrap()
+        //     .into());
+        match isbn {
+            Ok(isbn) => match super::bookshelf::BookRepository::search_from_isbn(isbn) {
+                Some(book) => Ok(book.into()),
+                None => Err(FieldError::new(
                     "no such book",
                     graphql_value!({"not_found_error": "book not found"}),
-                ))
-            }
+                )),
+            },
+            Err(err) => Err(FieldError::new(
+                err.to_string(),
+                graphql_value!({"isbn_error": "isbn error"}),
+            )),
         }
-        // let isbn = IsbnDigits::
+        // let isbn = match isbn.parse::<u64>() {
+        //     Ok(code) => match TIsbn::new(code) {
+        //         Ok(isbn) => isbn,
+        //         Err(err) => {
+        //             return Err(FieldError::new(
+        //                 err,
+        //                 graphql_value!({"range_error": "ISBN range error"}),
+        //             ))
+        //         }
+        //     },
+        //     Err(err) => {
+        //         return Err(FieldError::new(
+        //             "ISBN must be 13 digit number",
+        //             graphql_value!({"format_error": "ISBN parse error"}),
+        //         ))
+        //     }
+        // };
+        // match super::bookshelf::BookRepository::search_from_isbn(isbn) {
+        //     Some(book) => Ok(book),
+        //     None => {
+        //         return Err(FieldError::new(
+        //             "no such book",
+        //             graphql_value!({"not_found_error": "book not found"}),
+        //         ))
+        //     }
+        // }
     }
 
-    fn books(context: &Context, user_id: String) -> FieldResult<Vec<super::bookshelf::Book>> {
+    fn books(context: &Context, user_id: String) -> FieldResult<Vec<Book>> {
         let res_future = context.addr.send(super::bookshelf::Search(user_id));
         let res = res_future.wait();
         match res {
             Ok(result) => match result {
-                Ok(result) => Ok(result),
+                Ok(result) => Ok(result.into_iter().map(|book| book.into()).collect()),
                 Err(err) => panic!("{}", err),
             },
             Err(err) => panic!("{}", err),
@@ -102,7 +144,7 @@ pub struct Mutation;
     Context = Context,
 )]
 impl Mutation {
-    fn createBook(context: &Context, book_id: String) -> FieldResult<super::bookshelf::Book> {
+    fn createBook(context: &Context, book_id: String) -> FieldResult<Book> {
         let res_future = context.addr.send(super::bookshelf::Add);
         let res = res_future.wait();
         match res {
@@ -126,7 +168,7 @@ impl Mutation {
         let res_last = context.addr.send(super::bookshelf::Last);
         let res = res_last.wait();
         match res {
-            Ok(result) => Ok(result.expect("cannot fetch last book")),
+            Ok(result) => Ok(result.expect("cannot fetch last book").into()),
             Err(err) => panic!("{}", err),
         }
 
