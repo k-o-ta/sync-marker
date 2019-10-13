@@ -1,6 +1,6 @@
 use super::bookshelf::Book as TBook;
 use super::bookshelf::Isbn as TIsbn;
-use super::bookshelf::IsbnError;
+use super::bookshelf::{InMemoryBooksRepository, IsbnError};
 use actix::prelude::*;
 use actix::Addr;
 use futures::Future;
@@ -10,7 +10,7 @@ use juniper::RootNode;
 use std::convert::TryFrom;
 
 pub struct Context {
-    pub addr: Addr<super::bookshelf::BookRepository>,
+    pub addr: Addr<InMemoryBooksRepository>,
 }
 impl juniper::Context for Context {}
 
@@ -67,11 +67,11 @@ pub struct Query;
 impl Query {
     fn book_from_isbn(context: &Context, isbn: String) -> FieldResult<Book> {
         let isbn = TIsbn::try_from(isbn);
-        // return Ok(super::bookshelf::BookRepository::search_from_isbn(isbn.unwrap())
+        // return Ok(super::bookshelf::InMemoryBooksRepository::search_from_isbn(isbn.unwrap())
         //     .unwrap()
         //     .into());
         match isbn {
-            Ok(isbn) => match super::bookshelf::BookRepository::search_from_isbn(isbn) {
+            Ok(isbn) => match InMemoryBooksRepository::search_from_isbn(isbn) {
                 Some(book) => Ok(book.into()),
                 None => Err(FieldError::new(
                     "no such book",
@@ -100,7 +100,7 @@ impl Query {
         //         ))
         //     }
         // };
-        // match super::bookshelf::BookRepository::search_from_isbn(isbn) {
+        // match super::bookshelf::InMemoryBooksRepository::search_from_isbn(isbn) {
         //     Some(book) => Ok(book),
         //     None => {
         //         return Err(FieldError::new(
@@ -144,13 +144,31 @@ pub struct Mutation;
     Context = Context,
 )]
 impl Mutation {
-    fn createBook(context: &Context, book_id: String) -> FieldResult<Book> {
-        let res_future = context.addr.send(super::bookshelf::Add);
-        let res = res_future.wait();
-        match res {
-            Ok(resutl) => println!("ok"),
-            Err(err) => println!("ng"),
+    fn createBook(context: &Context, title: String, page_count: i32, isbn: String) -> FieldResult<Book> {
+        let isbn = TIsbn::try_from(isbn);
+        if let Ok(isbn) = isbn {
+            let res_future = context.addr.send(super::bookshelf::Add {
+                title,
+                page_count,
+                isbn,
+            });
+            let res = res_future.wait();
+            match res {
+                Ok(resutl) => println!("ok"),
+                Err(err) => println!("ng"),
+            };
+            let res_last = context.addr.send(super::bookshelf::Last);
+            let res = res_last.wait();
+            match res {
+                Ok(result) => return Ok(result.expect("cannot fetch last book").into()),
+                Err(err) => panic!("{}", err),
+            }
         };
+        Err(FieldError::new(
+            "isbn error",
+            graphql_value!({"isbn_error": "isbn error"}),
+        ))
+        // let res_future = context.addr.send(super::bookshelf::Add);
         // Arbiter::spawn({
         //     println!("spawn1");
         //     res_future
@@ -165,12 +183,6 @@ impl Mutation {
         //             println!("Actor is probably dead: {}", e);
         //         })
         // });
-        let res_last = context.addr.send(super::bookshelf::Last);
-        let res = res_last.wait();
-        match res {
-            Ok(result) => Ok(result.expect("cannot fetch last book").into()),
-            Err(err) => panic!("{}", err),
-        }
 
         // Ok(super::bookshelf::Book {
         //     id: "1".to_owned(),

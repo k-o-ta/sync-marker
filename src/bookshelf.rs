@@ -123,9 +123,9 @@ pub trait BooksRepository<Item, Error> {
     fn delete(&mut self, isbn: Isbn) -> bool;
     fn latest(&self) -> Option<&Book>;
 }
-pub struct BookRepository(pub Vec<Book>);
+pub struct InMemoryBooksRepository(pub Vec<Book>);
 
-impl Actor for BookRepository {
+impl Actor for InMemoryBooksRepository {
     type Context = Context<Self>;
     fn started(&mut self, ctx: &mut Context<Self>) {
         println!("Actor is alive");
@@ -135,12 +135,18 @@ impl Actor for BookRepository {
     }
 }
 
-pub struct Add;
+// pub struct Add;
+pub struct Add {
+    pub title: String,
+    pub page_count: i32,
+    pub isbn: Isbn,
+}
+
 impl Message for Add {
     type Result = Result<bool, io::Error>;
 }
 
-impl Handler<Add> for BookRepository {
+impl Handler<Add> for InMemoryBooksRepository {
     type Result = Result<bool, io::Error>;
     fn handle(&mut self, msg: Add, _ctx: &mut Context<Self>) -> Self::Result {
         println!("hadle Add");
@@ -153,10 +159,10 @@ pub struct SearchFromIsbn(pub Isbn);
 impl Message for SearchFromIsbn {
     type Result = Option<Book>;
 }
-impl Handler<SearchFromIsbn> for BookRepository {
+impl Handler<SearchFromIsbn> for InMemoryBooksRepository {
     type Result = Option<Book>;
     fn handle(&mut self, msg: SearchFromIsbn, _: &mut Context<Self>) -> Self::Result {
-        super::bookshelf::BookRepository::search_from_isbn(msg.0)
+        super::bookshelf::InMemoryBooksRepository::search_from_isbn(msg.0)
     }
 }
 
@@ -164,7 +170,7 @@ pub struct Search(pub String);
 impl Message for Search {
     type Result = Result<Vec<Book>, io::Error>;
 }
-impl Handler<Search> for BookRepository {
+impl Handler<Search> for InMemoryBooksRepository {
     type Result = Result<Vec<Book>, io::Error>;
     fn handle(&mut self, msg: Search, _: &mut Context<Self>) -> Self::Result {
         Ok(self.search(msg.0))
@@ -175,16 +181,16 @@ pub struct Last;
 impl Message for Last {
     type Result = Option<Book>;
 }
-impl Handler<Last> for BookRepository {
+impl Handler<Last> for InMemoryBooksRepository {
     type Result = Option<Book>;
     fn handle(&mut self, msg: Last, _: &mut Context<Self>) -> Self::Result {
         self.last()
     }
 }
 
-impl BookRepository {
+impl InMemoryBooksRepository {
     pub fn new() -> Self {
-        BookRepository(vec![
+        InMemoryBooksRepository(vec![
             Book {
                 id: "1".to_owned(),
                 name: "a".to_owned(),
@@ -267,6 +273,6 @@ impl Future for FindByIsbnFuture {
     type Item = Option<Book>;
     type Error = ();
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        Ok(Async::Ready(BookRepository::search_from_isbn(self.0)))
+        Ok(Async::Ready(InMemoryBooksRepository::search_from_isbn(self.0)))
     }
 }

@@ -17,6 +17,7 @@ use juniper::http::graphiql::graphiql_source;
 use juniper::http::GraphQLRequest;
 
 mod schema;
+use crate::bookshelf::InMemoryBooksRepository;
 use crate::schema::{create_schema, Schema};
 
 mod bookshelf;
@@ -59,13 +60,13 @@ fn index() -> impl Responder {
 
 struct State {
     schema: Arc<Schema>,
-    addr: actix::Addr<bookshelf::BookRepository>,
+    addr: actix::Addr<InMemoryBooksRepository>,
 }
 
 fn main() -> std::io::Result<()> {
     let sys = actix::System::new("sync-marker");
 
-    let addr = bookshelf::BookRepository::new().start();
+    let addr = InMemoryBooksRepository::new().start();
     let schema = std::sync::Arc::new(create_schema());
     // let state = State {
     //     schema: schema.clone(),
