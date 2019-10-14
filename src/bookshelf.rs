@@ -1,6 +1,7 @@
 use actix::prelude::*;
 use failure::Error;
 use futures::future::ok as FutureOk;
+use futures::future::FutureResult;
 use futures::{Async, Future, Poll};
 use reqwest::r#async::Client as AsyncClient;
 use reqwest::r#async::Response as AsyncResponse;
@@ -123,24 +124,75 @@ impl ToString for Isbn {
     }
 }
 
-pub trait BooksRepository<Item, Error> {
-    fn search_from_isbn(isbn: Isbn) -> Box<dyn Future<Item = AsyncResponse, Error = ReqwestError>>;
-    fn find_by_isbn(&self, isbn: Isbn) -> Option<&Book>;
-    fn add(&mut self, book: Book) -> bool;
-    fn delete(&mut self, isbn: Isbn) -> bool;
-    fn latest(&self) -> Option<&Book>;
-}
 pub struct InMemoryBooksRepository(pub Vec<Book>);
 
-impl BooksRepository<AsyncResponse, ReqwestError> for InMemoryBooksRepository {
-    fn search_from_isbn(isbn: Isbn) -> Box<dyn Future<Item = AsyncResponse, Error = ReqwestError>> {
+impl InMemoryBooksRepository {
+    // fn my_search(isbn: Isbn) -> impl Future<Item = Book, Error = Error> {}
+    // fn double_search(isbn: Isbn) -> impl Future<Item = (Book, Book), Error = ()> {
+    //     let client = AsyncClient::new();
+    //     let request1 = client
+    //         .get(Url::parse("https://www.googleapis.com/books/v1/volumes?q=isbn:9784797321944").unwrap())
+    //         .send()
+    //         .and_then(|mut response| response.json::<Volumes>());
+    //     let request2 = client
+    //         .get(Url::parse("https://www.googleapis.com/books/v1/volumes?q=isbn:9784797321944").unwrap())
+    //         .send()
+    //         .and_then(|mut response| response.json::<Volumes>());
+    //     request1
+    //         .join(request2)
+    //         .map(|(res1, res2)| {
+    //             let vol1 = res1
+    //                 .items
+    //                 .into_iter()
+    //                 .map(|v| Book::try_from(v))
+    //                 .collect::<Vec<Result<Book, Error>>>()
+    //                 .first()
+    //                 .unwrap()
+    //                 .unwrap();
+    //             let vol2 = res2
+    //                 .items
+    //                 .into_iter()
+    //                 .map(|v| Book::try_from(v))
+    //                 .collect::<Vec<Result<Book, Error>>>()
+    //                 .first()
+    //                 .unwrap()
+    //                 .unwrap();
+    //             // println!("{:?}", res1);
+    //             // println!("{:?}", res2);
+    //             (vol1, vol2)
+    //         })
+    //         .map_err(|err| {
+    //             println!("stdout error: {}", err);
+    //         })
+    // }
+    //
+    // fn do_search(isbn: Isbn) -> Result<(Book, Book), ()> {
+    //     let mut runtime = tokio::runtime::Runtime::new().unwrap();
+    //     runtime.block_on(Self::double_search(isbn))
+    //     // tokio::runtime::run(Self::double_search(isbn))
+    // }
+    fn search_from_isbn(isbn: Isbn) -> impl futures::future::Future<Item = Book, Error = reqwest::Error> {
+        dbg!("5");
         // not lookup
         let client = AsyncClient::new();
-        Box::new(
-            client
-                .get(Url::parse("https://www.googleapis.com/books/v1/volumes?q=isbn:9784797321944").unwrap())
-                .send(),
-        )
+        client
+            .get(Url::parse("https://www.googleapis.com/books/v1/volumes?q=isbn:9784797321944").unwrap())
+            .send()
+            .and_then(|mut response| {
+                dbg!("7");
+                response.json::<Volumes>()
+            })
+            .map(|volumes: Volumes| {
+                let book: Book = volumes
+                    .items
+                    .into_iter()
+                    .map(|volume: Volume| Book::try_from(volume))
+                    .nth(0)
+                    .unwrap() //nth(0)
+                    .unwrap(); //try_from
+                book
+            })
+        //     .map(|volumes| volumes.items.into_iter().map(|v| v.into()))
 
         // let res = client
         //     .get(Url::parse("https://www.googleapis.com/books/v1/volumes?q=isbn:9784797321944").unwrap())
@@ -148,8 +200,8 @@ impl BooksRepository<AsyncResponse, ReqwestError> for InMemoryBooksRepository {
         // res.and_then(|mut result| result.json::<Volumes>())
         //     .map(|volumes| volumes.items.into_iter().map(|v| v.into()))
     }
-    fn find_by_isbn(&self, isbn: Isbn) -> Option<&Book> {
-        self.0.iter().find(|book| book.isbn == isbn)
+    fn find_by_isbn(&self, isbn: Isbn) -> Option<Book> {
+        self.0.iter().find(|book| book.isbn == isbn).map(|book| book.clone())
     }
     fn add(&mut self, book: Book) -> bool {
         self.0.push(book);
@@ -192,7 +244,7 @@ impl Handler<Add> for InMemoryBooksRepository {
     type Result = Result<bool, io::Error>;
     fn handle(&mut self, msg: Add, _ctx: &mut Context<Self>) -> Self::Result {
         println!("hadle Add");
-        self.add();
+        // self.add();
         Ok(true)
     }
 }
@@ -212,53 +264,73 @@ impl ToString for BookInfoLocation {
 }
 pub type BookAndLocation = (Book, BookInfoLocation);
 impl Message for SearchFromIsbn {
-    type Result = Result<BookAndLocation, Error>;
+    type Result = Result<BookAndLocation, ReqwestError>;
 }
 impl Handler<SearchFromIsbn> for InMemoryBooksRepository {
-    type Result = Result<BookAndLocation, Error>;
+    type Result = Result<BookAndLocation, ReqwestError>;
     fn handle(&mut self, msg: SearchFromIsbn, _: &mut Context<Self>) -> Self::Result {
         // super::bookshelf::InMemoryBooksRepository::search_from_isbn(msg.0)
         dbg!("2");
-        let api: Box<dyn Future<Item = AsyncResponse, Error = ReqwestError>> =
-            InMemoryBooksRepository::search_from_isbn(msg.0);
+        // let api = InMemoryBooksRepository::search_from_isbn(msg.0);
         dbg!("3");
-        let inmemory = FutureOk(self.find_by_isbn(msg.0));
+        let inmemory: FutureResult<Option<Book>, _> = FutureOk(self.find_by_isbn(msg.0));
+        let data = inmemory.map(|inmemory| (inmemory.unwrap(), BookInfoLocation::InMemory));
         dbg!("4");
+        // let api = InMemoryBooksRepository::search_from_isbn(msg.0);
         // let pair = api.join(inmemory);
-        let pair = api.join(inmemory);
-        dbg!("5");
-        let mut rt = tokio::runtime::current_thread::Runtime::new().expect("new rt");
-        match rt.block_on(pair) {
-            Err(err) => panic!(err),
-            Ok(mut result) => {
-                dbg!("6");
-                if result.1.is_some() {
-                    let book = result.1.unwrap();
-                    return Ok((book.clone(), BookInfoLocation::InMemory));
-                } else {
-                    let volumes = result
-                        .0
-                        // .and_then(|mut result| result.json::<Volumes>())
-                        .json::<Volumes>()
-                        .wait()?;
-                    let book = volumes
-                        .items
-                        .into_iter()
-                        .map(|v| Book::try_from(v))
-                        .collect::<Vec<Result<Book, Error>>>()
-                        .pop();
-                    if let Some(book) = book {
-                        // let b = book?;
-                        return Ok((book?, BookInfoLocation::Network));
-                    } else {
-                        return Err(format_err!(""));
-                    }
-                    // .items?;
-                    // .map(|volumes| volumes.items.into_iter().map(|v| v.into()))
-                    // .wait();
-                }
-            }
-        }
+        // let data = pair.map(|(netw, inme)| {
+        //     dbg!("8");
+        //     if let Some(inmemory_book) = inme {
+        //         (inmemory_book.clone(), BookInfoLocation::InMemory)
+        //     } else {
+        //         (netw, BookInfoLocation::Network)
+        //     }
+        // });
+        let mut runtime = tokio::runtime::Runtime::new().unwrap();
+        dbg!("6");
+        runtime.block_on(data)
+        // tokio::runtime::run(
+        //     api.join(inmemory)
+        //         .map(|(res1, res2)| {
+        //             dbg!("6");
+        //         })
+        //         .map_err(|err| {
+        //             println!("err");
+        //         }),
+        // );
+        // let mut rt = tokio::runtime::current_thread::Runtime::new().expect("new rt");
+        // match rt.block_on(pair) {
+        //     Err(err) => panic!(err),
+        //     Ok(mut result) => {
+        //         dbg!("6");
+        //         if result.1.is_some() {
+        //             let book = result.1.unwrap();
+        //             return Ok((book.clone(), BookInfoLocation::InMemory));
+        //         } else {
+        //             let volumes = result
+        //                 .0
+        //                 // .and_then(|mut result| result.json::<Volumes>())
+        //                 .json::<Volumes>()
+        //                 .wait()?;
+        //             let book = volumes
+        //                 .items
+        //                 .into_iter()
+        //                 .map(|v| Book::try_from(v))
+        //                 .collect::<Vec<Result<Book, Error>>>()
+        //                 .pop();
+        //             if let Some(book) = book {
+        //                 // let b = book?;
+        //                 return Ok((book?, BookInfoLocation::Network));
+        //             } else {
+        //                 return Err(format_err!(""));
+        //             }
+        //             // .items?;
+        //             // .map(|volumes| volumes.items.into_iter().map(|v| v.into()))
+        //             // .wait();
+        //         }
+        //     }
+        // }
+        // Err(format_err!(""))
     }
 }
 
@@ -339,20 +411,20 @@ impl InMemoryBooksRepository {
     fn search(&self, id: String) -> Vec<Book> {
         self.0.clone()
     }
-    fn add(&mut self) -> bool {
-        let next_id = match self.0.last() {
-            Some(last) => last.id.parse::<i32>().expect("id must be num") + 1,
-            None => 1,
-        };
-        self.0.push(Book {
-            id: next_id.to_string(),
-            name: "c".to_owned(),
-            page: 300,
-            page_in_progress: Some(3),
-            isbn: Isbn::new(9780000000000).expect("invalid isbn"),
-        });
-        true
-    }
+    // fn add(&mut self) -> bool {
+    //     let next_id = match self.0.last() {
+    //         Some(last) => last.id.parse::<i32>().expect("id must be num") + 1,
+    //         None => 1,
+    //     };
+    //     self.0.push(Book {
+    //         id: next_id.to_string(),
+    //         name: "c".to_owned(),
+    //         page: 300,
+    //         page_in_progress: Some(3),
+    //         isbn: Isbn::new(9780000000000).expect("invalid isbn"),
+    //     });
+    //     true
+    // }
     fn last(&self) -> Option<Book> {
         self.0.last().and_then(|book| Some(book.clone()))
     }
