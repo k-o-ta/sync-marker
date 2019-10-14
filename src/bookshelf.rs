@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::io;
+use tokio::prelude::*;
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -78,7 +79,7 @@ impl TryFrom<Volume> for Book {
 pub struct Volumes {
     items: Vec<Volume>,
 }
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Book {
     pub id: String,
     pub name: String,
@@ -94,7 +95,7 @@ pub enum IsbnError {
     #[fail(display = "parse error to u64: {}", _0)]
     ParseError(String),
 }
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Isbn(pub u64);
 impl Isbn {
     pub fn new(isbn: u64) -> Result<Self, Error> {
@@ -265,13 +266,36 @@ impl ToString for BookInfoLocation {
 pub type BookAndLocation = (Book, BookInfoLocation);
 impl Message for SearchFromIsbn {
     type Result = Result<BookAndLocation, ReqwestError>;
+    // type Result = Box<dyn Future<Item = BookAndLocation, Error = ReqwestError>>;
 }
 impl Handler<SearchFromIsbn> for InMemoryBooksRepository {
     type Result = Result<BookAndLocation, ReqwestError>;
+    // type Result = Box<dyn Future<Item = BookAndLocation, Error = ReqwestError>>;
+    // type Result = impl Future<Future<Item = BookAndLocation, Error = ReqwestError>>;
     fn handle(&mut self, msg: SearchFromIsbn, _: &mut Context<Self>) -> Self::Result {
         // super::bookshelf::InMemoryBooksRepository::search_from_isbn(msg.0)
         dbg!("2");
-        // let api = InMemoryBooksRepository::search_from_isbn(msg.0);
+        let api = InMemoryBooksRepository::search_from_isbn(msg.0);
+        // let data = api.map(|api| (api, BookInfoLocation::Network));
+        // let (tx, rx) = tokio::sync::mpsc::channel(1);
+        let (tx, rx) = futures::sync::oneshot::channel();
+        Arbiter::spawn(
+            api.map(|api| {
+                tx.send(api.name.clone());
+                println!("{:?}", api)
+            })
+            .map_err(|e| println!("not spawned")),
+        );
+        std::thread::spawn(|| {
+            println!("new thread");
+            let future = rx.map(|rec| {
+                println!("got value: {}", rec);
+            });
+        });
+        // rx.for_each(|value| {
+        //     println!("got value: {}", value);
+        //     Ok(())
+        // });
         dbg!("3");
         let inmemory: FutureResult<Option<Book>, _> = FutureOk(self.find_by_isbn(msg.0));
         let data = inmemory.map(|inmemory| (inmemory.unwrap(), BookInfoLocation::InMemory));
@@ -286,9 +310,10 @@ impl Handler<SearchFromIsbn> for InMemoryBooksRepository {
         //         (netw, BookInfoLocation::Network)
         //     }
         // });
-        let mut runtime = tokio::runtime::Runtime::new().unwrap();
-        dbg!("6");
-        runtime.block_on(data)
+        data.wait()
+        // let mut runtime = tokio::runtime::Runtime::new().unwrap();
+        // dbg!("6");
+        // runtime.block_on(data)
         // tokio::runtime::run(
         //     api.join(inmemory)
         //         .map(|(res1, res2)| {
@@ -364,7 +389,7 @@ impl InMemoryBooksRepository {
                 name: "a".to_owned(),
                 page: 100,
                 page_in_progress: Some(1),
-                isbn: Isbn::new(9780000000000).expect("invalid isbn"),
+                isbn: Isbn::new(9784797321944).expect("invalid isbn"),
             },
             Book {
                 id: "2".to_owned(),

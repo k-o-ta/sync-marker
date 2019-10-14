@@ -66,12 +66,12 @@ pub struct Query;
 )]
 impl Query {
     fn book_from_isbn(context: &Context, isbn: String) -> FieldResult<(Book)> {
-        println!("0");
         dbg!("0");
         let isbn = TIsbn::try_from(isbn);
         if let Ok(isbn) = isbn {
             dbg!("1");
             let res_future = context.addr.send(super::bookshelf::SearchFromIsbn(isbn));
+            dbg!("10");
             let res = res_future.wait();
             match res {
                 Ok(res) => match res {
