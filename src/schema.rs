@@ -75,23 +75,29 @@ impl Query {
             let res = res_future.wait();
             match res {
                 Ok(res) => match res {
-                    Ok(book_info) => return Ok(book_info.0.into_graphql_book(book_info.1.to_string())),
+                    Ok(book_info) => {
+                        dbg!("11");
+                        dbg!("{:?}", &book_info.1);
+                        return Ok(book_info.0.into_graphql_book(book_info.1.to_string()));
+                    }
                     Err(err) => {
+                        dbg!("12");
                         return Err(FieldError::new(
                             err.to_string(),
                             graphql_value!({"isbn_error": "isbn error"}),
-                        ))
+                        ));
                     }
                 },
                 Err(err) => {
+                    dbg!("13");
                     return Err(FieldError::new(
                         err.to_string(),
                         graphql_value!({"isbn_error": "isbn error"}),
-                    ))
+                    ));
                 }
             };
         };
-        dbg!("10");
+        dbg!("14");
         Err(FieldError::new(
             "isbn error",
             graphql_value!({"isbn_error": "isbn error"}),

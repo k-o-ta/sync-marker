@@ -250,67 +250,93 @@ impl Handler<Add> for InMemoryBooksRepository {
     }
 }
 
+pub struct Hoge;
+impl Message for Hoge {
+    type Result = Result<i32, ()>;
+}
+impl Handler<Hoge> for InMemoryBooksRepository {
+    type Result = ResponseFuture<i32, ()>;
+    fn handle(&mut self, msg: Hoge, _: &mut Context<Self>) -> Self::Result {
+        FutureOk(1).boxed()
+    }
+}
+
 pub struct SearchFromIsbn(pub Isbn);
+#[derive(Debug)]
 pub enum BookInfoLocation {
     Network,
     InMemory,
 }
 impl ToString for BookInfoLocation {
     fn to_string(&self) -> String {
-        match self {
-            Network => String::from("network"),
-            InMemory => String::from("inmemory"),
+        match *self {
+            Self::Network => {
+                dbg!("network");
+                String::from("network")
+            }
+            Self::InMemory => {
+                dbg!("inmemory");
+
+                String::from("inmemory")
+            }
         }
     }
 }
+// #[derive(Debug)]
 pub type BookAndLocation = (Book, BookInfoLocation);
 impl Message for SearchFromIsbn {
     type Result = Result<BookAndLocation, ReqwestError>;
     // type Result = Box<dyn Future<Item = BookAndLocation, Error = ReqwestError>>;
 }
 impl Handler<SearchFromIsbn> for InMemoryBooksRepository {
-    type Result = Result<BookAndLocation, ReqwestError>;
+    // type Result = Result<BookAndLocation, ReqwestError>;
     // type Result = Box<dyn Future<Item = BookAndLocation, Error = ReqwestError>>;
     // type Result = impl Future<Future<Item = BookAndLocation, Error = ReqwestError>>;
+    type Result = ResponseFuture<BookAndLocation, ReqwestError>;
     fn handle(&mut self, msg: SearchFromIsbn, _: &mut Context<Self>) -> Self::Result {
         // super::bookshelf::InMemoryBooksRepository::search_from_isbn(msg.0)
         dbg!("2");
-        let api = InMemoryBooksRepository::search_from_isbn(msg.0);
+        // let api = InMemoryBooksRepository::search_from_isbn(msg.0);
         // let data = api.map(|api| (api, BookInfoLocation::Network));
         // let (tx, rx) = tokio::sync::mpsc::channel(1);
-        let (tx, rx) = futures::sync::oneshot::channel();
-        Arbiter::spawn(
-            api.map(|api| {
-                tx.send(api.name.clone());
-                println!("{:?}", api)
-            })
-            .map_err(|e| println!("not spawned")),
-        );
-        std::thread::spawn(|| {
-            println!("new thread");
-            let future = rx.map(|rec| {
-                println!("got value: {}", rec);
-            });
-        });
+        // let (tx, rx) = futures::sync::oneshot::channel();
+        // Arbiter::spawn(
+        //     api.map(|api| {
+        //         tx.send(api.name.clone());
+        //         println!("{:?}", api)
+        //     })
+        //     .map_err(|e| println!("not spawned")),
+        // );
+        // Arbiter::spawn(
+        //     rx.map(|rec| println!("got value: {}", rec))
+        //         .map_err(|e| println!("rx spawn error")),
+        // );
         // rx.for_each(|value| {
         //     println!("got value: {}", value);
         //     Ok(())
         // });
         dbg!("3");
         let inmemory: FutureResult<Option<Book>, _> = FutureOk(self.find_by_isbn(msg.0));
-        let data = inmemory.map(|inmemory| (inmemory.unwrap(), BookInfoLocation::InMemory));
+        // let data = inmemory.map(|inmemory| (inmemory.unwrap(), BookInfoLocation::InMemory));
         dbg!("4");
-        // let api = InMemoryBooksRepository::search_from_isbn(msg.0);
-        // let pair = api.join(inmemory);
-        // let data = pair.map(|(netw, inme)| {
-        //     dbg!("8");
-        //     if let Some(inmemory_book) = inme {
-        //         (inmemory_book.clone(), BookInfoLocation::InMemory)
-        //     } else {
-        //         (netw, BookInfoLocation::Network)
-        //     }
-        // });
-        data.wait()
+        let api = InMemoryBooksRepository::search_from_isbn(msg.0);
+        let pair = api.join(inmemory);
+        let data = pair.map(|(netw, inme)| {
+            dbg!("8");
+            if let Some(inmemory_book) = inme {
+                dbg!("8.5");
+                (inmemory_book.clone(), BookInfoLocation::InMemory)
+            } else {
+                dbg!("8.6");
+                (netw, BookInfoLocation::Network)
+            }
+        });
+        // rx.wait()
+        //     .map(|rec| println!("got value: {}", rec))
+        //     .map_err(|e| println!("rx spawn error"));
+        // dbg!("40");
+        // data.wait()
+        data.boxed()
         // let mut runtime = tokio::runtime::Runtime::new().unwrap();
         // dbg!("6");
         // runtime.block_on(data)
@@ -389,7 +415,7 @@ impl InMemoryBooksRepository {
                 name: "a".to_owned(),
                 page: 100,
                 page_in_progress: Some(1),
-                isbn: Isbn::new(9784797321944).expect("invalid isbn"),
+                isbn: Isbn::new(9784797321943).expect("invalid isbn"),
             },
             Book {
                 id: "2".to_owned(),
