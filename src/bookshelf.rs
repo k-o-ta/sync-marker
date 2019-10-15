@@ -72,6 +72,7 @@ trait BooksRepository {
     fn add(&mut self, book: Book) -> bool;
     fn latest(&self) -> Option<&Book>;
     fn delete(&mut self, isbn: Isbn) -> bool;
+    fn find_by_id(&self, id: u32) -> Option<&Book>;
 }
 
 pub struct InMemoryBooksRepository(pub Vec<Book>);
@@ -93,6 +94,9 @@ impl BooksRepository for InMemoryBooksRepository {
             return true;
         }
         false
+    }
+    fn find_by_id(&self, id: u32) -> Option<&Book> {
+        self.0.iter().find(|book| book.id == id)
     }
 }
 
@@ -188,10 +192,68 @@ fn search_from_isbn(isbn: Isbn) -> impl futures::future::Future<Item = BookInfo,
 }
 
 trait BookmarksRepository {
-    fn progress(&mut self, user_id: u32, book_id: u32, page_in_progress: u16);
+    fn progress(
+        &mut self,
+        user_id: u32,
+        book_id: u32,
+        page_in_progress: u16,
+        users_repository: &dyn UsersRepository,
+        books_repository: &dyn BooksRepository,
+    ) -> Result<(), ProgressBookmarkRepositoryError>;
 }
 struct InMemoryBookmarksRepository(Vec<Bookmark>);
-// impl BookmarksRepository for InMemoryBookmarksRepository {}
+impl BookmarksRepository for InMemoryBookmarksRepository {
+    fn progress(
+        &mut self,
+        user_id: u32,
+        book_id: u32,
+        page_in_progress: u16,
+        users_repository: &dyn UsersRepository,
+        books_repository: &dyn BooksRepository,
+    ) -> Result<(), ProgressBookmarkRepositoryError> {
+        if users_repository.find_by_id(user_id).is_none() {
+            return Err(ProgressBookmarkRepositoryError::UserNotFoundError(user_id).into());
+        }
+        if books_repository.find_by_id(book_id).is_none() {
+            return Err(ProgressBookmarkRepositoryError::BookNotFoundError(book_id).into());
+        }
+        if let Some(bookmark) = self
+            .0
+            .iter_mut()
+            .find(|bookmark| bookmark.user_id == user_id && bookmark.book_id == book_id)
+        {
+            bookmark.page_in_progress = page_in_progress
+        } else {
+            let latest_bookmark = self.0.iter().max_by_key(|bookmark| bookmark.id);
+            let bookmark = if let Some(latest_bookmark) = latest_bookmark {
+                Bookmark {
+                    id: latest_bookmark.id + 1,
+                    user_id,
+                    book_id,
+                    page_in_progress,
+                }
+            } else {
+                Bookmark {
+                    id: 1,
+                    user_id,
+                    book_id,
+                    page_in_progress,
+                }
+            };
+            self.0.push(bookmark)
+        }
+        Ok(())
+    }
+}
+#[derive(Fail, Debug)]
+enum ProgressBookmarkRepositoryError {
+    #[fail(display = "User Not Found")]
+    UserNotFoundError(u32),
+    #[fail(display = "Book Not Found")]
+    BookNotFoundError(u32),
+    #[fail(display = "page_cuont max is {}, but entered {}", _1, _0)]
+    PageCountOverFlowError(u16, u16),
+}
 struct Bookmark {
     id: u64,
     user_id: u32,
@@ -200,15 +262,43 @@ struct Bookmark {
 }
 
 trait UsersRepository {
-    fn add(&mut self, email: String, password: String) -> bool;
-    fn find_by(&self, email: String, password: String) -> Option<&User>;
+    fn add(&mut self, email: String, password: String) -> Result<(), AddUserRepositoryError>;
+    fn find_by_user_info(&self, email: String, password: String) -> Option<&User>;
+    fn find_by_session(&self, session_id: String) -> Option<&User>;
+    fn find_by_id(&self, user_id: u32) -> Option<&User>;
 }
 struct InMemoryUsersRepository(Vec<User>);
-// impl UsersRepository for InMemoryBooksRepository {}
+impl UsersRepository for InMemoryUsersRepository {
+    fn add(&mut self, email: String, password: String) -> Result<(), AddUserRepositoryError> {
+        if self.0.iter().find(|user| user.email == email).is_some() {
+            Err(AddUserRepositoryError::DuplicatedUserError(email).into())
+        } else {
+            Ok(())
+        }
+    }
+    fn find_by_user_info(&self, email: String, password: String) -> Option<&User> {
+        self.0
+            .iter()
+            .find(|user| user.email == email && user.password == password)
+    }
+    fn find_by_session(&self, session_id: String) -> Option<&User> {
+        self.0.iter().find(|user| user.session_id == session_id)
+    }
+    fn find_by_id(&self, user_id: u32) -> Option<&User> {
+        self.0.iter().find(|user| user.id == user_id)
+    }
+}
 struct User {
     id: u32,
     email: String,
     password: String,
+    session_id: String,
+}
+
+#[derive(Fail, Debug)]
+enum AddUserRepositoryError {
+    #[fail(display = "the email address have been already taken: {}", _0)]
+    DuplicatedUserError(String),
 }
 
 // Actor
