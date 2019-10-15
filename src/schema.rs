@@ -47,18 +47,6 @@ impl TBook {
     }
 }
 
-// impl From<TBook> for Book {
-//     fn from(item: TBook) -> Self {
-//         Book {
-//             id: item.id,
-//             name: item.name,
-//             page: item.page,
-//             isbn: Isbn::from(item.isbn),
-//
-//         }
-//     }
-// }
-
 pub struct Query;
 
 #[juniper::object(
@@ -66,38 +54,30 @@ pub struct Query;
 )]
 impl Query {
     fn book_from_isbn(context: &Context, isbn: String) -> FieldResult<(Book)> {
-        dbg!("0");
         let isbn = TIsbn::try_from(isbn);
         if let Ok(isbn) = isbn {
-            dbg!("1");
             let res_future = context.addr.send(super::bookshelf::SearchFromIsbn(isbn));
-            dbg!("10");
             let res = res_future.wait();
             match res {
                 Ok(res) => match res {
                     Ok(book_info) => {
-                        dbg!("11");
-                        dbg!("{:?}", &book_info.1);
                         return Ok(book_info.0.into_graphql_book(book_info.1.to_string()));
                     }
                     Err(err) => {
-                        dbg!("12");
                         return Err(FieldError::new(
                             err.to_string(),
-                            graphql_value!({"isbn_error": "isbn error"}),
+                            graphql_value!({"create_error": "create error"}),
                         ));
                     }
                 },
                 Err(err) => {
-                    dbg!("13");
                     return Err(FieldError::new(
                         err.to_string(),
-                        graphql_value!({"isbn_error": "isbn error"}),
+                        graphql_value!({"create_error": "create error"}),
                     ));
                 }
             };
         };
-        dbg!("14");
         Err(FieldError::new(
             "isbn error",
             graphql_value!({"isbn_error": "isbn error"}),
