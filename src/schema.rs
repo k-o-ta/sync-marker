@@ -1,4 +1,4 @@
-use super::bookshelf::Book as TBook;
+use super::bookshelf::BookInfo as TBookInfo;
 use super::bookshelf::Isbn as TIsbn;
 use super::bookshelf::{BookInfoLocation, InMemoryBooksRepository, IsbnError};
 use actix::prelude::*;
@@ -29,16 +29,14 @@ impl From<TIsbn> for Isbn {
 
 #[derive(GraphQLObject)]
 pub struct Book {
-    id: String,
     name: String,
     page: i32,
     isbn: Isbn,
     data_source: String,
 }
-impl TBook {
+impl TBookInfo {
     fn into_graphql_book(self, data_source: String) -> Book {
         Book {
-            id: self.id,
             name: self.title,
             page: self.page_count,
             isbn: Isbn::from(self.isbn),

@@ -40,7 +40,7 @@ pub enum BookApiError {
     NotFound,
 }
 
-impl TryFrom<Volume> for Book {
+impl TryFrom<Volume> for BookInfo {
     type Error = Error;
     fn try_from(item: Volume) -> Result<Self, Self::Error> {
         let industry_identifier = item
@@ -51,8 +51,7 @@ impl TryFrom<Volume> for Book {
         // .ok_or("not found isbn_13");
         match industry_identifier {
             Some(identifier) => {
-                Isbn::try_from(identifier.identifier.clone()).map(|isbn| Book {
-                    id: item.id,
+                Isbn::try_from(identifier.identifier.clone()).map(|isbn| BookInfo {
                     title: item.volume_info.title,
                     page_count: item.volume_info.page_count,
                     isbn: isbn, // isbn: Isbn::new(isbn.identifier).unwrap(),
@@ -79,7 +78,7 @@ pub struct InMemoryBooksRepository(pub Vec<Book>);
 
 impl BooksRepository for InMemoryBooksRepository {
     fn find_by_isbn(&self, isbn: Isbn) -> Option<Book> {
-        self.0.iter().find(|book| book.isbn == isbn).map(|book| book.clone())
+        self.0.iter().find(|book| book.isbn() == isbn).map(|book| book.clone())
     }
     fn add(&mut self, book: Book) -> bool {
         self.0.push(book);
@@ -89,7 +88,7 @@ impl BooksRepository for InMemoryBooksRepository {
         self.0.last().and_then(|book| Some(book))
     }
     fn delete(&mut self, isbn: Isbn) -> bool {
-        if let Some(index) = self.0.iter_mut().position(|book| book.isbn == isbn) {
+        if let Some(index) = self.0.iter_mut().position(|book| book.isbn() == isbn) {
             self.0.remove(index);
             return true;
         }
@@ -99,7 +98,23 @@ impl BooksRepository for InMemoryBooksRepository {
 
 #[derive(Clone, Debug)]
 pub struct Book {
-    pub id: String,
+    pub id: u32,
+    pub info: BookInfo,
+}
+impl Book {
+    pub fn title(&self) -> &str {
+        self.info.title.as_str()
+    }
+    pub fn page_count(&self) -> i32 {
+        self.info.page_count
+    }
+    pub fn isbn(&self) -> Isbn {
+        self.info.isbn
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct BookInfo {
     pub title: String,
     pub page_count: i32,
     pub isbn: Isbn,
@@ -142,7 +157,7 @@ impl ToString for Isbn {
     }
 }
 
-fn search_from_isbn(isbn: Isbn) -> impl futures::future::Future<Item = Book, Error = reqwest::Error> {
+fn search_from_isbn(isbn: Isbn) -> impl futures::future::Future<Item = BookInfo, Error = reqwest::Error> {
     let client = AsyncClient::new();
     client
         .get(
@@ -161,15 +176,39 @@ fn search_from_isbn(isbn: Isbn) -> impl futures::future::Future<Item = Book, Err
             response.json::<Volumes>()
         })
         .map(|volumes: Volumes| {
-            let book: Book = volumes
+            let book: BookInfo = volumes
                 .items
                 .into_iter()
-                .map(|volume: Volume| Book::try_from(volume))
+                .map(|volume: Volume| BookInfo::try_from(volume))
                 .nth(0)
                 .unwrap() //nth(0)
                 .unwrap(); //try_from
             book
         })
+}
+
+trait BookmarksRepository {
+    fn progress(&mut self, user_id: u32, book_id: u32, page_in_progress: u16);
+}
+struct InMemoryBookmarksRepository(Vec<Bookmark>);
+// impl BookmarksRepository for InMemoryBookmarksRepository {}
+struct Bookmark {
+    id: u64,
+    user_id: u32,
+    book_id: u32,
+    page_in_progress: u16,
+}
+
+trait UsersRepository {
+    fn add(&mut self, email: String, password: String) -> bool;
+    fn find_by(&self, email: String, password: String) -> Option<&User>;
+}
+struct InMemoryUsersRepository(Vec<User>);
+// impl UsersRepository for InMemoryBooksRepository {}
+struct User {
+    id: u32,
+    email: String,
+    password: String,
 }
 
 // Actor
@@ -225,7 +264,7 @@ impl ToString for BookInfoLocation {
     }
 }
 // #[derive(Debug)]
-pub type BookAndLocation = (Book, BookInfoLocation);
+pub type BookAndLocation = (BookInfo, BookInfoLocation);
 impl Message for SearchFromIsbn {
     type Result = Result<BookAndLocation, ReqwestError>;
 }
@@ -237,7 +276,7 @@ impl Handler<SearchFromIsbn> for InMemoryBooksRepository {
         let pair = api.join(inmemory);
         let data = pair.map(|(netw, inme)| {
             if let Some(inmemory_book) = inme {
-                (inmemory_book.clone(), BookInfoLocation::InMemory)
+                (inmemory_book.info.clone(), BookInfoLocation::InMemory)
             } else {
                 (netw, BookInfoLocation::Network)
             }
@@ -250,16 +289,20 @@ impl InMemoryBooksRepository {
     pub fn new() -> Self {
         InMemoryBooksRepository(vec![
             Book {
-                id: "1".to_owned(),
-                title: "a".to_owned(),
-                page_count: 100,
-                isbn: Isbn::new(9784797321943).expect("invalid isbn"),
+                id: 1,
+                info: BookInfo {
+                    title: "a".to_owned(),
+                    page_count: 100,
+                    isbn: Isbn::new(9784797321943).expect("invalid isbn"),
+                },
             },
             Book {
-                id: "2".to_owned(),
-                title: "b".to_owned(),
-                page_count: 200,
-                isbn: Isbn::new(9780000000001).expect("invalid isbn"),
+                id: 2,
+                info: BookInfo {
+                    title: "b".to_owned(),
+                    page_count: 200,
+                    isbn: Isbn::new(9780000000001).expect("invalid isbn"),
+                },
             },
         ])
     }
