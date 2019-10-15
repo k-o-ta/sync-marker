@@ -39,8 +39,8 @@ impl TBook {
     fn into_graphql_book(self, data_source: String) -> Book {
         Book {
             id: self.id,
-            name: self.name,
-            page: self.page,
+            name: self.title,
+            page: self.page_count,
             isbn: Isbn::from(self.isbn),
             data_source,
         }
@@ -103,21 +103,6 @@ impl Query {
             graphql_value!({"isbn_error": "isbn error"}),
         ))
     }
-
-    fn books(context: &Context, user_id: String) -> FieldResult<Vec<Book>> {
-        let res_future = context.addr.send(super::bookshelf::Search(user_id));
-        let res = res_future.wait();
-        match res {
-            Ok(result) => match result {
-                Ok(result) => Ok(result
-                    .into_iter()
-                    .map(|book| book.into_graphql_book(String::from(BookInfoLocation::InMemory.to_string())))
-                    .collect()),
-                Err(err) => panic!("{}", err),
-            },
-            Err(err) => panic!("{}", err),
-        }
-    }
 }
 
 pub struct Mutation;
@@ -126,7 +111,7 @@ pub struct Mutation;
     Context = Context,
 )]
 impl Mutation {
-    fn createBook(context: &Context, title: String, page_count: i32, isbn: String) -> FieldResult<Book> {
+    fn createBook(context: &Context, title: String, page_count: i32, isbn: String) -> FieldResult<bool> {
         let isbn = TIsbn::try_from(isbn);
         if let Ok(isbn) = isbn {
             let res_future = context.addr.send(super::bookshelf::Add {
@@ -136,46 +121,19 @@ impl Mutation {
             });
             let res = res_future.wait();
             match res {
-                Ok(resutl) => println!("ok"),
-                Err(err) => println!("ng"),
-            };
-            let res_last = context.addr.send(super::bookshelf::Last);
-            let res = res_last.wait();
-            match res {
-                Ok(result) => {
-                    return Ok(result
-                        .expect("cannot fetch last book")
-                        .into_graphql_book(BookInfoLocation::InMemory.to_string()))
+                Ok(resutl) => {
+                    return Ok(true);
                 }
-                Err(err) => panic!("{}", err),
-            }
-        };
+                Err(err) => {
+                    println!("ng");
+                    return Err(FieldError::new(err, graphql_value!({"isbn_error": "isbn error"})));
+                }
+            };
+        }
         Err(FieldError::new(
             "isbn error",
             graphql_value!({"isbn_error": "isbn error"}),
         ))
-        // let res_future = context.addr.send(super::bookshelf::Add);
-        // Arbiter::spawn({
-        //     println!("spawn1");
-        //     res_future
-        //         .map(|res| {
-        //             println!("spawn2");
-        //             match res {
-        //                 Ok(result) => println!("ok"),
-        //                 Err(err) => println!("no"),
-        //             }
-        //         })
-        //         .map_err(|e| {
-        //             println!("Actor is probably dead: {}", e);
-        //         })
-        // });
-
-        // Ok(super::bookshelf::Book {
-        //     id: "1".to_owned(),
-        //     name: "a".to_owned(),
-        //     page: 100,
-        //     page_in_progress: Some(1),
-        // })
     }
 }
 
