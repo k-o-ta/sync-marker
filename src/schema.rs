@@ -1,6 +1,8 @@
 use super::bookshelf::BookInfo as TBookInfo;
 use super::bookshelf::Isbn as TIsbn;
-use super::bookshelf::{BookInfoLocation, InMemoryBooksRepository, IsbnError};
+use super::bookshelf::{
+    BookInfoLocation, InMemoryBookmarksRepository, InMemoryBooksRepository, InMemoryUsersRepository, IsbnError,
+};
 use actix::prelude::*;
 use actix::Addr;
 use futures::Future;
@@ -10,7 +12,9 @@ use juniper::RootNode;
 use std::convert::TryFrom;
 
 pub struct Context {
-    pub addr: Addr<InMemoryBooksRepository>,
+    pub books_repository_addr: Addr<InMemoryBooksRepository>,
+    pub users_repository_addr: Addr<InMemoryUsersRepository>,
+    pub bookmarks_repository_addr: Addr<InMemoryBookmarksRepository>,
 }
 impl juniper::Context for Context {}
 
@@ -54,7 +58,9 @@ impl Query {
     fn book_from_isbn(context: &Context, isbn: String) -> FieldResult<(Book)> {
         let isbn = TIsbn::try_from(isbn);
         if let Ok(isbn) = isbn {
-            let res_future = context.addr.send(super::bookshelf::SearchFromIsbn(isbn));
+            let res_future = context
+                .books_repository_addr
+                .send(super::bookshelf::SearchFromIsbn(isbn));
             let res = res_future.wait();
             match res {
                 Ok(res) => match res {
@@ -92,7 +98,7 @@ impl Mutation {
     fn createBook(context: &Context, title: String, page_count: i32, isbn: String) -> FieldResult<bool> {
         let isbn = TIsbn::try_from(isbn);
         if let Ok(isbn) = isbn {
-            let res_future = context.addr.send(super::bookshelf::Add {
+            let res_future = context.books_repository_addr.send(super::bookshelf::Add {
                 title,
                 page_count,
                 isbn,
@@ -112,6 +118,21 @@ impl Mutation {
             "isbn error",
             graphql_value!({"isbn_error": "isbn error"}),
         ))
+    }
+    fn createUser(context: &Context, email: String, password: String) -> FieldResult<bool> {
+        let res_future = context
+            .users_repository_addr
+            .send(super::bookshelf::AddUser { email, password });
+        let res = res_future.wait();
+        match res {
+            Ok(result) => return Ok(true),
+            Err(err) => {
+                return Err(FieldError::new(
+                    err,
+                    graphql_value!({"create_user": "create user error"}),
+                ));
+            }
+        }
     }
 }
 

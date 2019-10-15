@@ -99,6 +99,11 @@ impl BooksRepository for InMemoryBooksRepository {
         self.0.iter().find(|book| book.id == id)
     }
 }
+impl InMemoryBookmarksRepository {
+    pub fn new() -> Self {
+        InMemoryBookmarksRepository(Vec::new())
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct Book {
@@ -201,7 +206,7 @@ trait BookmarksRepository {
         books_repository: &dyn BooksRepository,
     ) -> Result<(), ProgressBookmarkRepositoryError>;
 }
-struct InMemoryBookmarksRepository(Vec<Bookmark>);
+pub struct InMemoryBookmarksRepository(Vec<Bookmark>);
 impl BookmarksRepository for InMemoryBookmarksRepository {
     fn progress(
         &mut self,
@@ -267,12 +272,29 @@ trait UsersRepository {
     fn find_by_session(&self, session_id: String) -> Option<&User>;
     fn find_by_id(&self, user_id: u32) -> Option<&User>;
 }
-struct InMemoryUsersRepository(Vec<User>);
+pub struct InMemoryUsersRepository(Vec<User>);
 impl UsersRepository for InMemoryUsersRepository {
     fn add(&mut self, email: String, password: String) -> Result<(), AddUserRepositoryError> {
         if self.0.iter().find(|user| user.email == email).is_some() {
             Err(AddUserRepositoryError::DuplicatedUserError(email).into())
         } else {
+            let latest_user = self.0.iter().max_by_key(|user| user.id);
+            let user = if let Some(latest_user) = latest_user {
+                User {
+                    id: latest_user.id + 1,
+                    email,
+                    password,
+                    session_id: "".to_string(),
+                }
+            } else {
+                User {
+                    id: 1,
+                    email,
+                    password,
+                    session_id: "".to_string(),
+                }
+            };
+            self.0.push(user);
             Ok(())
         }
     }
@@ -300,19 +322,43 @@ enum AddUserRepositoryError {
     #[fail(display = "the email address have been already taken: {}", _0)]
     DuplicatedUserError(String),
 }
+impl InMemoryUsersRepository {
+    pub fn new() -> Self {
+        InMemoryUsersRepository(Vec::new())
+    }
+}
 
 // Actor
 impl Actor for InMemoryBooksRepository {
     type Context = Context<Self>;
     fn started(&mut self, ctx: &mut Context<Self>) {
-        println!("Actor is alive");
+        println!("BooksRepository Actor is alive");
     }
     fn stopped(&mut self, ctx: &mut Context<Self>) {
-        println!("Actor is stopped");
+        println!("BooksRepository Actor is stopped");
+    }
+}
+impl Actor for InMemoryUsersRepository {
+    type Context = Context<Self>;
+    fn started(&mut self, ctx: &mut Context<Self>) {
+        println!("UsersRepository Actor is alive");
+    }
+    fn stopped(&mut self, ctx: &mut Context<Self>) {
+        println!("UsersRepository Actor is stopped");
+    }
+}
+impl Actor for InMemoryBookmarksRepository {
+    type Context = Context<Self>;
+    fn started(&mut self, ctx: &mut Context<Self>) {
+        println!("BookmarksRepository Actor is alive");
+    }
+    fn stopped(&mut self, ctx: &mut Context<Self>) {
+        println!("BookmarksRepository Actor is stopped");
     }
 }
 
 // Message
+//  bookshelf
 pub struct Add {
     pub title: String,
     pub page_count: i32,
@@ -401,5 +447,23 @@ impl InMemoryBooksRepository {
     }
     fn last(&self) -> Option<Book> {
         self.0.last().and_then(|book| Some(book.clone()))
+    }
+}
+//   user
+pub struct AddUser {
+    pub email: String,
+    pub password: String,
+}
+
+impl Message for AddUser {
+    type Result = Result<bool, io::Error>;
+}
+
+impl Handler<AddUser> for InMemoryUsersRepository {
+    type Result = Result<bool, io::Error>;
+    fn handle(&mut self, msg: AddUser, _ctx: &mut Context<Self>) -> Self::Result {
+        println!("hadle Add");
+        self.add(msg.email, msg.password);
+        Ok(true)
     }
 }

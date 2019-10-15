@@ -1,0 +1,7 @@
+mutation {
+  createBook(title: "test", pageCount: 300, isbn: "9780000000001")
+  createUser(email: "foo@example.com", password: "123abcdef")
+}
+mutation {
+
+}

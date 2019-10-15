@@ -17,7 +17,9 @@ use juniper::http::graphiql::graphiql_source;
 use juniper::http::GraphQLRequest;
 
 mod schema;
+use crate::bookshelf::InMemoryBookmarksRepository;
 use crate::bookshelf::InMemoryBooksRepository;
+use crate::bookshelf::InMemoryUsersRepository;
 use crate::schema::{create_schema, Schema};
 
 mod bookshelf;
@@ -34,8 +36,17 @@ fn graphql(
 ) -> impl Future<Item = HttpResponse, Error = Error> {
     web::block(move || {
         return match state.get_ref() {
-            State { schema, addr } => {
-                let ctx = schema::Context { addr: addr.clone() };
+            State {
+                schema,
+                books_repository_addr,
+                users_repository_addr,
+                bookmarks_repository_addr,
+            } => {
+                let ctx = schema::Context {
+                    books_repository_addr: books_repository_addr.clone(),
+                    users_repository_addr: users_repository_addr.clone(),
+                    bookmarks_repository_addr: bookmarks_repository_addr.clone(),
+                };
                 let res = data.execute(&schema, &ctx);
                 Ok::<_, serde_json::error::Error>(serde_json::to_string(&res)?)
             }
@@ -60,13 +71,17 @@ fn index() -> impl Responder {
 
 struct State {
     schema: Arc<Schema>,
-    addr: actix::Addr<InMemoryBooksRepository>,
+    books_repository_addr: actix::Addr<InMemoryBooksRepository>,
+    users_repository_addr: actix::Addr<InMemoryUsersRepository>,
+    bookmarks_repository_addr: actix::Addr<InMemoryBookmarksRepository>,
 }
 
 fn main() -> std::io::Result<()> {
     let sys = actix::System::new("sync-marker");
 
-    let addr = InMemoryBooksRepository::new().start();
+    let books_repository_addr = InMemoryBooksRepository::new().start();
+    let users_repository_addr = InMemoryUsersRepository::new().start();
+    let bookmarks_repository_addr = InMemoryBookmarksRepository::new().start();
     let schema = std::sync::Arc::new(create_schema());
     // let state = State {
     //     schema: schema.clone(),
@@ -77,7 +92,9 @@ fn main() -> std::io::Result<()> {
             // .data(schema.clone())
             .data(State {
                 schema: schema.clone(),
-                addr: addr.clone(),
+                books_repository_addr: books_repository_addr.clone(),
+                users_repository_addr: users_repository_addr.clone(),
+                bookmarks_repository_addr: bookmarks_repository_addr.clone(),
             })
             .service(web::resource("/graphql").route(web::post().to_async(graphql)))
             .service(web::resource("/graphiql").route(web::get().to(graphiql)))
