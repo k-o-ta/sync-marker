@@ -3,18 +3,23 @@ use super::bookshelf::Isbn as TIsbn;
 use super::bookshelf::{
     BookInfoLocation, InMemoryBookmarksRepository, InMemoryBooksRepository, InMemoryUsersRepository, IsbnError,
 };
+use super::session::InMemorySessionsRepository;
 use actix::prelude::*;
 use actix::Addr;
+use actix_session::Session;
 use futures::Future;
 use juniper::FieldError;
 use juniper::FieldResult;
 use juniper::RootNode;
 use std::convert::TryFrom;
+use std::sync::Arc;
 
 pub struct Context {
     pub books_repository_addr: Addr<InMemoryBooksRepository>,
     pub users_repository_addr: Addr<InMemoryUsersRepository>,
     pub bookmarks_repository_addr: Addr<InMemoryBookmarksRepository>,
+    pub sessions_repository_addr: Addr<InMemorySessionsRepository>,
+    // session: Arc<Session>,
 }
 impl juniper::Context for Context {}
 
