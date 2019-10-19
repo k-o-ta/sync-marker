@@ -23,7 +23,7 @@ mod bookshelf;
 mod schema;
 mod session;
 
-use crate::bookshelf::InMemoryBookmarksRepository;
+use crate::bookmark::InMemoryBookmarksRepository;
 use crate::bookshelf::InMemoryBooksRepository;
 use crate::bookshelf::InMemoryUsersRepository;
 use crate::schema::{create_schema, Schema};

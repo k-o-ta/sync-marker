@@ -1,9 +1,8 @@
+use super::bookmark::InMemoryBookmarksRepository;
 use super::bookshelf::BookInfo as TBookInfo;
 use super::bookshelf::FindByUserInfo;
 use super::bookshelf::Isbn as TIsbn;
-use super::bookshelf::{
-    BookInfoLocation, InMemoryBookmarksRepository, InMemoryBooksRepository, InMemoryUsersRepository, IsbnError,
-};
+use super::bookshelf::{BookInfoLocation, InMemoryBooksRepository, InMemoryUsersRepository, IsbnError};
 use super::session::{Add as AddSessionDigest, InMemorySessionsRepository, SessionDigest};
 use actix::prelude::*;
 use actix::Addr;

@@ -67,7 +67,7 @@ pub struct Volumes {
 }
 
 // model
-trait BooksRepository {
+pub trait BooksRepository {
     fn find_by_isbn(&self, isbn: Isbn) -> Option<Book>;
     fn add(&mut self, book: Book) -> bool;
     fn latest(&self) -> Option<&Book>;
@@ -97,11 +97,6 @@ impl BooksRepository for InMemoryBooksRepository {
     }
     fn find_by_id(&self, id: u32) -> Option<&Book> {
         self.0.iter().find(|book| book.id == id)
-    }
-}
-impl InMemoryBookmarksRepository {
-    pub fn new() -> Self {
-        InMemoryBookmarksRepository(Vec::new())
     }
 }
 
@@ -196,77 +191,7 @@ fn search_from_isbn(isbn: Isbn) -> impl futures::future::Future<Item = BookInfo,
         })
 }
 
-trait BookmarksRepository {
-    fn progress(
-        &mut self,
-        user_id: u32,
-        book_id: u32,
-        page_in_progress: u16,
-        users_repository: &dyn UsersRepository,
-        books_repository: &dyn BooksRepository,
-    ) -> Result<(), ProgressBookmarkRepositoryError>;
-}
-pub struct InMemoryBookmarksRepository(Vec<Bookmark>);
-impl BookmarksRepository for InMemoryBookmarksRepository {
-    fn progress(
-        &mut self,
-        user_id: u32,
-        book_id: u32,
-        page_in_progress: u16,
-        users_repository: &dyn UsersRepository,
-        books_repository: &dyn BooksRepository,
-    ) -> Result<(), ProgressBookmarkRepositoryError> {
-        if users_repository.find_by_id(user_id).is_none() {
-            return Err(ProgressBookmarkRepositoryError::UserNotFoundError(user_id).into());
-        }
-        if books_repository.find_by_id(book_id).is_none() {
-            return Err(ProgressBookmarkRepositoryError::BookNotFoundError(book_id).into());
-        }
-        if let Some(bookmark) = self
-            .0
-            .iter_mut()
-            .find(|bookmark| bookmark.user_id == user_id && bookmark.book_id == book_id)
-        {
-            bookmark.page_in_progress = page_in_progress
-        } else {
-            let latest_bookmark = self.0.iter().max_by_key(|bookmark| bookmark.id);
-            let bookmark = if let Some(latest_bookmark) = latest_bookmark {
-                Bookmark {
-                    id: latest_bookmark.id + 1,
-                    user_id,
-                    book_id,
-                    page_in_progress,
-                }
-            } else {
-                Bookmark {
-                    id: 1,
-                    user_id,
-                    book_id,
-                    page_in_progress,
-                }
-            };
-            self.0.push(bookmark)
-        }
-        Ok(())
-    }
-}
-#[derive(Fail, Debug)]
-enum ProgressBookmarkRepositoryError {
-    #[fail(display = "User Not Found")]
-    UserNotFoundError(u32),
-    #[fail(display = "Book Not Found")]
-    BookNotFoundError(u32),
-    #[fail(display = "page_cuont max is {}, but entered {}", _1, _0)]
-    PageCountOverFlowError(u16, u16),
-}
-struct Bookmark {
-    id: u64,
-    user_id: u32,
-    book_id: u32,
-    page_in_progress: u16,
-}
-
-trait UsersRepository {
+pub trait UsersRepository {
     fn add(&mut self, email: String, password: String) -> Result<(), AddUserRepositoryError>;
     fn find_by_user_info(&self, email: String, password: String) -> Option<&User>;
     fn find_by_session(&self, session_id: String) -> Option<&User>;
@@ -346,15 +271,6 @@ impl Actor for InMemoryUsersRepository {
     }
     fn stopped(&mut self, ctx: &mut Context<Self>) {
         println!("UsersRepository Actor is stopped");
-    }
-}
-impl Actor for InMemoryBookmarksRepository {
-    type Context = Context<Self>;
-    fn started(&mut self, ctx: &mut Context<Self>) {
-        println!("BookmarksRepository Actor is alive");
-    }
-    fn stopped(&mut self, ctx: &mut Context<Self>) {
-        println!("BookmarksRepository Actor is stopped");
     }
 }
 
