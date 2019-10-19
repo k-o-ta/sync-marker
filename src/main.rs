@@ -9,6 +9,7 @@ use actix::*;
 use actix_session::{CookieSession, Session};
 use actix_web::{web, App, Error, HttpResponse, HttpServer, Responder};
 use futures::future::Future;
+use std::cell::RefCell;
 use std::sync::Arc;
 
 #[macro_use]
@@ -41,6 +42,21 @@ fn graphql(
     session: Session,
 ) -> impl Future<Item = HttpResponse, Error = Error> {
     // let arc_session = Arc::new(session);
+    // return futures::future::err::<_, serde_json::error::Error>("hoge");
+    // return Ok::<_, serde_json::error::Error>(HttpResponse::Ok().body("Hello world!"));
+    // let session_digest = RefCell::new(session.get::<String>("session_digest").unwrap());
+    // let hoge = RefCell::new(session.get::<String>("counte").unwrap());
+    // let session_digest = RefCell::new(Some(String::from("ab")));
+    let session_digest = match session.get::<[u8; 20]>("session_digest") {
+        Ok(session_digest) => {
+            println!("{:?}", &session_digest);
+            RefCell::new(session_digest)
+        }
+        Err(err) => {
+            println!("{}", err);
+            RefCell::new(None)
+        }
+    };
     web::block(move || {
         return match state.get_ref() {
             State {
@@ -55,10 +71,10 @@ fn graphql(
                     users_repository_addr: users_repository_addr.clone(),
                     bookmarks_repository_addr: bookmarks_repository_addr.clone(),
                     sessions_repository_addr: sessions_repository_addr.clone(),
-                    // session: arc_session.clone(),
+                    session_digest: session_digest,
                 };
                 let res = data.execute(&schema, &ctx);
-                Ok::<_, serde_json::error::Error>(serde_json::to_string(&res)?)
+                Ok::<_, serde_json::error::Error>((serde_json::to_string(&res)?, ctx))
             }
         };
         // let (schema, addr) = state;
@@ -73,8 +89,8 @@ fn graphql(
     })
     .map_err(Error::from)
     .and_then(move |user| {
-        session.set("counter", 1);
-        Ok(HttpResponse::Ok().content_type("application/json").body(user))
+        session.set("session_digest", user.1.session_digest.borrow_mut().as_ref());
+        Ok(HttpResponse::Ok().content_type("application/json").body(user.0))
     })
 }
 

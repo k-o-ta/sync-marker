@@ -1,9 +1,10 @@
 use super::bookshelf::BookInfo as TBookInfo;
+use super::bookshelf::FindByUserInfo;
 use super::bookshelf::Isbn as TIsbn;
 use super::bookshelf::{
     BookInfoLocation, InMemoryBookmarksRepository, InMemoryBooksRepository, InMemoryUsersRepository, IsbnError,
 };
-use super::session::InMemorySessionsRepository;
+use super::session::{Add as AddSessionDigest, InMemorySessionsRepository, SessionDigest};
 use actix::prelude::*;
 use actix::Addr;
 use actix_session::Session;
@@ -11,6 +12,8 @@ use futures::Future;
 use juniper::FieldError;
 use juniper::FieldResult;
 use juniper::RootNode;
+use std::borrow::BorrowMut;
+use std::cell::RefCell;
 use std::convert::TryFrom;
 use std::sync::Arc;
 
@@ -19,7 +22,7 @@ pub struct Context {
     pub users_repository_addr: Addr<InMemoryUsersRepository>,
     pub bookmarks_repository_addr: Addr<InMemoryBookmarksRepository>,
     pub sessions_repository_addr: Addr<InMemorySessionsRepository>,
-    // session: Arc<Session>,
+    pub session_digest: RefCell<Option<SessionDigest>>, // pub session_digest: Option<String>,
 }
 impl juniper::Context for Context {}
 
@@ -136,6 +139,36 @@ impl Mutation {
                     err,
                     graphql_value!({"create_user": "create user error"}),
                 ));
+            }
+        }
+    }
+    fn login(mut context: &Context, email: String, password: String) -> FieldResult<bool> {
+        // (*context).session_digest = None;
+        // use rand::Rng;
+        let res_future = context.users_repository_addr.send(FindByUserInfo { email, password });
+        let res = res_future.wait();
+        match res {
+            Ok(res) => {
+                match res {
+                    Some(res) => {
+                        use rand::{thread_rng, Rng};
+                        let mut arr = [0u8; 20];
+                        thread_rng().fill(&mut arr[..]);
+                        // let converted: String = String::from_utf8(arr.to_vec()).unwrap();
+                        let mut my_ref = context.session_digest.borrow_mut();
+                        *my_ref = Some(arr.clone());
+
+                        let res_session_future = context.sessions_repository_addr.send(AddSessionDigest {
+                            session_digest: arr,
+                            user_id: res.id,
+                        });
+                        Ok(true)
+                    }
+                    None => Ok(false),
+                }
+            }
+            Err(err) => {
+                return Err(FieldError::new(err, graphql_value!({"login": "login_error"})));
             }
         }
     }

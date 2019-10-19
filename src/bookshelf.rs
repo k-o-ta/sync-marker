@@ -310,8 +310,9 @@ impl UsersRepository for InMemoryUsersRepository {
         self.0.iter().find(|user| user.id == user_id)
     }
 }
-struct User {
-    id: u32,
+#[derive(Clone)]
+pub struct User {
+    pub id: u32,
     email: String,
     password: String,
     session_id: String,
@@ -358,6 +359,23 @@ impl Actor for InMemoryBookmarksRepository {
 }
 
 // Message
+//  user
+pub struct FindByUserInfo {
+    pub email: String,
+    pub password: String,
+}
+
+impl Message for FindByUserInfo {
+    type Result = Option<User>;
+}
+
+impl Handler<FindByUserInfo> for InMemoryUsersRepository {
+    type Result = Option<User>;
+    fn handle(&mut self, msg: FindByUserInfo, _ctx: &mut Context<Self>) -> Self::Result {
+        self.find_by_user_info(msg.email, msg.password).map(|user| user.clone())
+    }
+}
+
 //  bookshelf
 pub struct Add {
     pub title: String,
