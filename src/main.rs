@@ -18,6 +18,7 @@ extern crate juniper;
 use juniper::http::graphiql::graphiql_source;
 use juniper::http::GraphQLRequest;
 
+mod bookmark;
 mod bookshelf;
 mod schema;
 mod session;
@@ -50,11 +51,11 @@ fn graphql(
     let session_digest = match session.get::<[u8; 20]>("session_digest") {
         Ok(session_digest) => {
             println!("{:?}", &session_digest);
-            RefCell::new(session_digest)
+            RefCell::new((session_digest, false))
         }
         Err(err) => {
             println!("{}", err);
-            RefCell::new(None)
+            RefCell::new((None, false))
         }
     };
     web::block(move || {
@@ -89,7 +90,9 @@ fn graphql(
     })
     .map_err(Error::from)
     .and_then(move |user| {
-        session.set("session_digest", user.1.session_digest.borrow_mut().as_ref());
+        if user.1.session_digest.borrow_mut().1 {
+            session.set("session_digest", user.1.session_digest.borrow_mut().0.as_ref());
+        }
         Ok(HttpResponse::Ok().content_type("application/json").body(user.0))
     })
 }

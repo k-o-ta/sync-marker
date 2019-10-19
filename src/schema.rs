@@ -22,7 +22,7 @@ pub struct Context {
     pub users_repository_addr: Addr<InMemoryUsersRepository>,
     pub bookmarks_repository_addr: Addr<InMemoryBookmarksRepository>,
     pub sessions_repository_addr: Addr<InMemorySessionsRepository>,
-    pub session_digest: RefCell<Option<SessionDigest>>, // pub session_digest: Option<String>,
+    pub session_digest: RefCell<(Option<SessionDigest>, bool)>, // pub session_digest: Option<String>,
 }
 impl juniper::Context for Context {}
 
@@ -156,7 +156,7 @@ impl Mutation {
                         thread_rng().fill(&mut arr[..]);
                         // let converted: String = String::from_utf8(arr.to_vec()).unwrap();
                         let mut my_ref = context.session_digest.borrow_mut();
-                        *my_ref = Some(arr.clone());
+                        *my_ref = (Some(arr.clone()), true);
 
                         let res_session_future = context.sessions_repository_addr.send(AddSessionDigest {
                             session_digest: arr,
