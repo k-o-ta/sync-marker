@@ -22,12 +22,13 @@ mod bookmark;
 mod bookshelf;
 mod schema;
 mod session;
+mod user;
 
 use crate::bookmark::InMemoryBookmarksRepository;
 use crate::bookshelf::InMemoryBooksRepository;
-use crate::bookshelf::InMemoryUsersRepository;
 use crate::schema::{create_schema, Schema};
 use crate::session::InMemorySessionsRepository;
+use crate::user::InMemoryUsersRepository;
 
 // use std::sync::Arc;
 

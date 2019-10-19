@@ -1,9 +1,9 @@
 use super::bookmark::InMemoryBookmarksRepository;
 use super::bookshelf::BookInfo as TBookInfo;
-use super::bookshelf::FindByUserInfo;
 use super::bookshelf::Isbn as TIsbn;
-use super::bookshelf::{BookInfoLocation, InMemoryBooksRepository, InMemoryUsersRepository, IsbnError};
+use super::bookshelf::{BookInfoLocation, InMemoryBooksRepository, IsbnError};
 use super::session::{Add as AddSessionDigest, InMemorySessionsRepository, SessionDigest};
+use super::user::{AddUser, FindByUserInfo, InMemoryUsersRepository};
 use actix::prelude::*;
 use actix::Addr;
 use actix_session::Session;
@@ -127,9 +127,7 @@ impl Mutation {
         ))
     }
     fn createUser(context: &Context, email: String, password: String) -> FieldResult<bool> {
-        let res_future = context
-            .users_repository_addr
-            .send(super::bookshelf::AddUser { email, password });
+        let res_future = context.users_repository_addr.send(AddUser { email, password });
         let res = res_future.wait();
         match res {
             Ok(result) => return Ok(true),
@@ -170,6 +168,10 @@ impl Mutation {
                 return Err(FieldError::new(err, graphql_value!({"login": "login_error"})));
             }
         }
+    }
+
+    fn progress(context: &Context, isbn: String, page_count: i32) -> FieldResult<bool> {
+        Ok(true)
     }
 }
 

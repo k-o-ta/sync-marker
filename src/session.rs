@@ -70,3 +70,14 @@ impl Handler<Add> for InMemorySessionsRepository {
         Ok(())
     }
 }
+
+pub struct FindUserId(pub SessionDigest);
+impl Message for FindUserId {
+    type Result = Option<u32>;
+}
+impl Handler<FindUserId> for InMemorySessionsRepository {
+    type Result = Option<u32>;
+    fn handle(&mut self, msg: FindUserId, _ctx: &mut Context<Self>) -> Self::Result {
+        self.find_session(msg.0).map(|user_id| user_id.clone())
+    }
+}
