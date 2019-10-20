@@ -1,4 +1,4 @@
-use super::bookmark::InMemoryBookmarksRepository;
+use super::bookmark::{InMemoryBookmarksRepository, Progress};
 use super::bookshelf::BookInfo as TBookInfo;
 use super::bookshelf::Isbn as TIsbn;
 use super::bookshelf::{BookInfoLocation, InMemoryBooksRepository, IsbnError};
@@ -171,7 +171,58 @@ impl Mutation {
     }
 
     fn progress(context: &Context, isbn: String, page_count: i32) -> FieldResult<bool> {
-        Ok(true)
+        let isbn = TIsbn::try_from(isbn);
+        let isbn = if let Ok(isbn) = isbn {
+            isbn
+        } else {
+            return Err(FieldError::new(
+                "isbn error",
+                graphql_value!({"progress error": "isbn error"}),
+            ));
+        };
+        let page_in_progress = if ((std::u16::MIN as i32)..=(std::u16::MAX as i32)).contains(&page_count) {
+            page_count as u16
+        } else {
+            return Err(FieldError::new(
+                "page range error",
+                graphql_value!({"progress": "progress_error"}),
+            ));
+        };
+        let session_digest = if let Some(session_digest) = context.session_digest.borrow().0 {
+            session_digest
+        } else {
+            return Err(FieldError::new(
+                "session digest error",
+                graphql_value!({"progress": "session_digest_error"}),
+            ));
+        };
+
+        let res_future = context.bookmarks_repository_addr.send(Progress {
+            isbn,
+            page_in_progress,
+            session_digest,
+            sessions_repository: context.sessions_repository_addr.clone(),
+            users_repository: context.users_repository_addr.clone(),
+            books_repository: context.books_repository_addr.clone(),
+        });
+        let res = res_future.wait();
+        match res {
+            Ok(res) => match res {
+                Ok(res) => Ok(true),
+                Err(err) => {
+                    return Err(FieldError::new(
+                        "progress error",
+                        graphql_value!({"progress": "progress_error"}),
+                    ));
+                }
+            },
+            Err(err) => {
+                return Err(FieldError::new(
+                    "mail box error",
+                    graphql_value!({"progress": "mail_box_error"}),
+                ));
+            }
+        }
     }
 }
 
