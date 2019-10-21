@@ -159,6 +159,7 @@ impl Mutation {
                             session_digest: arr,
                             user_id: res.id,
                         });
+                        res_session_future.wait();
                         Ok(true)
                     }
                     None => Ok(false),
@@ -171,6 +172,7 @@ impl Mutation {
     }
 
     fn progress(context: &Context, isbn: String, page_count: i32) -> FieldResult<bool> {
+        dbg!("1");
         let isbn = TIsbn::try_from(isbn);
         let isbn = if let Ok(isbn) = isbn {
             isbn
@@ -180,6 +182,7 @@ impl Mutation {
                 graphql_value!({"progress error": "isbn error"}),
             ));
         };
+        dbg!("2");
         let page_in_progress = if ((std::u16::MIN as i32)..=(std::u16::MAX as i32)).contains(&page_count) {
             page_count as u16
         } else {
@@ -188,6 +191,7 @@ impl Mutation {
                 graphql_value!({"progress": "progress_error"}),
             ));
         };
+        dbg!("3");
         let session_digest = if let Some(session_digest) = context.session_digest.borrow().0 {
             session_digest
         } else {
@@ -197,6 +201,7 @@ impl Mutation {
             ));
         };
 
+        dbg!("4");
         let res_future = context.bookmarks_repository_addr.send(Progress {
             isbn,
             page_in_progress,
@@ -205,6 +210,7 @@ impl Mutation {
             users_repository: context.users_repository_addr.clone(),
             books_repository: context.books_repository_addr.clone(),
         });
+        dbg!("5");
         let res = res_future.wait();
         match res {
             Ok(res) => match res {

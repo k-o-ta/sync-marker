@@ -45,6 +45,7 @@ impl UsersRepository for InMemoryUsersRepository {
         self.0.iter().find(|user| user.session_id == session_id)
     }
     fn find_by_id(&self, user_id: u32) -> Option<&User> {
+        dbg!("14");
         self.0.iter().find(|user| user.id == user_id)
     }
 }
@@ -119,6 +120,7 @@ impl Message for FindById {
 impl Handler<FindById> for InMemoryUsersRepository {
     type Result = Option<User>;
     fn handle(&mut self, msg: FindById, _ctx: &mut Context<Self>) -> Self::Result {
+        dbg!("13");
         self.find_by_id(msg.0).map(|user| user.clone())
     }
 }

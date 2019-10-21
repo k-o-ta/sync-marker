@@ -79,10 +79,12 @@ pub struct InMemoryBooksRepository(pub Vec<Book>);
 
 impl BooksRepository for InMemoryBooksRepository {
     fn find_by_isbn(&self, isbn: Isbn) -> Option<Book> {
+        dbg!("11");
         self.0.iter().find(|book| book.isbn() == isbn).map(|book| book.clone())
     }
     fn add(&mut self, book: Book) -> bool {
         self.0.push(book);
+        println!("books {:?}", self.0);
         true
     }
     fn latest(&self) -> Option<&Book> {
@@ -219,7 +221,27 @@ impl Handler<Add> for InMemoryBooksRepository {
     type Result = Result<bool, io::Error>;
     fn handle(&mut self, msg: Add, _ctx: &mut Context<Self>) -> Self::Result {
         println!("hadle Add");
-        // self.add();
+        let latest_book = self.0.iter().max_by_key(|book| book.id);
+        let book = if let Some(latest_book) = latest_book {
+            Book {
+                id: latest_book.id + 1,
+                info: BookInfo {
+                    title: msg.title,
+                    page_count: msg.page_count,
+                    isbn: msg.isbn,
+                },
+            }
+        } else {
+            Book {
+                id: 1,
+                info: BookInfo {
+                    title: msg.title,
+                    page_count: msg.page_count,
+                    isbn: msg.isbn,
+                },
+            }
+        };
+        self.add(book);
         Ok(true)
     }
 }
@@ -263,29 +285,29 @@ impl Handler<SearchFromIsbn> for InMemoryBooksRepository {
                 (netw, BookInfoLocation::Network)
             }
         });
-        data.boxed()
+        Box::new(data)
     }
 }
 
 impl InMemoryBooksRepository {
     pub fn new() -> Self {
         InMemoryBooksRepository(vec![
-            Book {
-                id: 1,
-                info: BookInfo {
-                    title: "a".to_owned(),
-                    page_count: 100,
-                    isbn: Isbn::new(9784797321943).expect("invalid isbn"),
-                },
-            },
-            Book {
-                id: 2,
-                info: BookInfo {
-                    title: "b".to_owned(),
-                    page_count: 200,
-                    isbn: Isbn::new(9780000000001).expect("invalid isbn"),
-                },
-            },
+            // Book {
+            //     id: 1,
+            //     info: BookInfo {
+            //         title: "a".to_owned(),
+            //         page_count: 100,
+            //         isbn: Isbn::new(9784797321943).expect("invalid isbn"),
+            //     },
+            // },
+            // Book {
+            //     id: 2,
+            //     info: BookInfo {
+            //         title: "b".to_owned(),
+            //         page_count: 200,
+            //         isbn: Isbn::new(9780000000001).expect("invalid isbn"),
+            //     },
+            // },
         ])
     }
     fn search(&self, id: String) -> Vec<Book> {

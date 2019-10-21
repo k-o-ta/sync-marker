@@ -3,5 +3,16 @@ mutation {
   createUser(email: "foo@example.com", password: "123abcdef")
 }
 mutation {
+  createBook(title: "test2", pageCount: 400, isbn: "9780000000002")
+}
 
+mutation {
+  login(email: "foo@example.com", password: "123abcdef")
+}
+
+mutation {
+  progress(isbn:"9780000000001", pageCount: 29)
+}
+mutation {
+  progress(isbn:"9780000000002", pageCount: 139)
 }
