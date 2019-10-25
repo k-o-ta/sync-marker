@@ -1,6 +1,10 @@
+use super::bookmark::{FindByUserId as FindBookmarksByUserId, InMemoryBookmarksRepository};
+
+use super::bookshelf::{Book, FindById as FindBooksById, InMemoryBooksRepository};
 use super::session::SessionDigest;
 use actix::prelude::*;
 use std::io;
+use std::io::{Error, ErrorKind};
 use tokio::prelude::*;
 
 pub trait UsersRepository {
@@ -64,7 +68,12 @@ enum AddUserRepositoryError {
 }
 impl InMemoryUsersRepository {
     pub fn new() -> Self {
-        InMemoryUsersRepository(Vec::new())
+        InMemoryUsersRepository(vec![User {
+            id: 1,
+            email: String::from("foo@example.com"),
+            password: String::from("123abcdef"),
+            session_id: String::from(""),
+        }])
     }
 }
 
@@ -122,5 +131,55 @@ impl Handler<FindById> for InMemoryUsersRepository {
     fn handle(&mut self, msg: FindById, _ctx: &mut Context<Self>) -> Self::Result {
         dbg!("13");
         self.find_by_id(msg.0).map(|user| user.clone())
+    }
+}
+
+pub struct FindBooks {
+    pub bookmarks_repository: Addr<InMemoryBookmarksRepository>,
+    pub books_repository: Addr<InMemoryBooksRepository>,
+    pub user_id: u32,
+}
+impl Message for FindBooks {
+    type Result = Result<Vec<Book>, io::Error>;
+}
+
+impl Handler<FindBooks> for InMemoryUsersRepository {
+    // type Result = Option<Vec<Book>>;
+    type Result = ResponseFuture<Vec<Book>, io::Error>;
+    fn handle(&mut self, msg: FindBooks, _ctx: &mut Context<Self>) -> Self::Result {
+        match msg {
+            FindBooks {
+                bookmarks_repository,
+                books_repository,
+                user_id,
+            } => {
+                // let bookmarks = bookmarks_repository
+                //     .send(FindBookmarksByUserId(user_id))
+                //     .map_err(|e| eprintln!("{:?}", e));
+                // let books = bookmarks.and_then(move |bookmarks| {
+                //     bookmarks.map(|bookmarks| {
+                //         books_repository
+                //             .send(FindBooksById(
+                //                 bookmarks.iter().map(|bookmark| bookmark.book_id).collect(),
+                //             ))
+                //             .map(move |_| ())
+                //             .map_err(|_| ())
+                //     });
+                // });
+                //
+                let books = bookmarks_repository
+                    .send(FindBookmarksByUserId(user_id))
+                    .map_err(|e| Error::new(ErrorKind::Other, "oh no!"))
+                    .and_then(move |bookmarks| {
+                        books_repository
+                            .send(FindBooksById(
+                                bookmarks.unwrap().iter().map(|bookmark| bookmark.book_id).collect(),
+                            ))
+                            .map(move |books| books.unwrap())
+                            .map_err(|e| Error::new(ErrorKind::Other, "oh no!"))
+                    });
+                return Box::new(books);
+            }
+        }
     }
 }

@@ -12,6 +12,13 @@ impl InMemoryBookmarksRepository {
     pub fn new() -> Self {
         InMemoryBookmarksRepository(Vec::new())
     }
+    fn find_by_user_id(&self, user_id: u32) -> Vec<Bookmark> {
+        self.0
+            .iter()
+            .filter(|bookmark| bookmark.user_id == user_id)
+            .map(|bookmark| bookmark.clone())
+            .collect()
+    }
 }
 
 trait BookmarksRepository {
@@ -309,11 +316,11 @@ enum ProgressBookmarkRepositoryError {
     #[fail(display = "page_cuont max is {}, but entered {}", _1, _0)]
     PageCountOverFlowError(u16, u16),
 }
-#[derive(Debug)]
-struct Bookmark {
+#[derive(Debug, Clone)]
+pub struct Bookmark {
     id: u64,
     user_id: u32,
-    book_id: u32,
+    pub book_id: u32,
     page_in_progress: u16,
 }
 impl Actor for InMemoryBookmarksRepository {
@@ -452,5 +459,16 @@ impl Handler<Progress> for InMemoryBookmarksRepository {
         //     page_in_progress: 1,
         // });
         Ok(())
+    }
+}
+
+pub struct FindByUserId(pub u32);
+impl Message for FindByUserId {
+    type Result = Result<Vec<Bookmark>, io::Error>;
+}
+impl Handler<FindByUserId> for InMemoryBookmarksRepository {
+    type Result = Result<Vec<Bookmark>, io::Error>;
+    fn handle(&mut self, msg: FindByUserId, _ctx: &mut Context<Self>) -> Self::Result {
+        Ok(self.find_by_user_id(msg.0))
     }
 }

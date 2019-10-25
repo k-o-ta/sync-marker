@@ -292,26 +292,37 @@ impl Handler<SearchFromIsbn> for InMemoryBooksRepository {
 impl InMemoryBooksRepository {
     pub fn new() -> Self {
         InMemoryBooksRepository(vec![
-            // Book {
-            //     id: 1,
-            //     info: BookInfo {
-            //         title: "a".to_owned(),
-            //         page_count: 100,
-            //         isbn: Isbn::new(9784797321943).expect("invalid isbn"),
-            //     },
-            // },
-            // Book {
-            //     id: 2,
-            //     info: BookInfo {
-            //         title: "b".to_owned(),
-            //         page_count: 200,
-            //         isbn: Isbn::new(9780000000001).expect("invalid isbn"),
-            //     },
-            // },
+            Book {
+                id: 1,
+                info: BookInfo {
+                    title: "実践Rust入門".to_owned(),
+                    page_count: 576,
+                    isbn: Isbn::new(9784297105594).expect("invalid isbn"),
+                },
+            }, // Book {
+               //     id: 1,
+               //     info: BookInfo {
+               //         title: "a".to_owned(),
+               //         page_count: 100,
+               //         isbn: Isbn::new(9784797321943).expect("invalid isbn"),
+               //     },
+               // },
+               // Book {
+               //     id: 2,
+               //     info: BookInfo {
+               //         title: "b".to_owned(),
+               //         page_count: 200,
+               //         isbn: Isbn::new(9780000000001).expect("invalid isbn"),
+               //     },
+               // },
         ])
     }
-    fn search(&self, id: String) -> Vec<Book> {
-        self.0.clone()
+    fn search(&self, ids: Vec<u32>) -> Vec<Book> {
+        self.0
+            .iter()
+            .filter(|book| ids.contains(&book.id))
+            .map(|book| book.clone())
+            .collect()
     }
     fn last(&self) -> Option<Book> {
         self.0.last().and_then(|book| Some(book.clone()))
@@ -325,5 +336,16 @@ impl Handler<FindByIsbn> for InMemoryBooksRepository {
     type Result = Option<Book>;
     fn handle(&mut self, msg: FindByIsbn, _: &mut Context<Self>) -> Self::Result {
         self.find_by_isbn(msg.0)
+    }
+}
+
+pub struct FindById(pub Vec<u32>);
+impl Message for FindById {
+    type Result = Result<Vec<Book>, io::Error>;
+}
+impl Handler<FindById> for InMemoryBooksRepository {
+    type Result = Result<Vec<Book>, io::Error>;
+    fn handle(&mut self, msg: FindById, _: &mut Context<Self>) -> Self::Result {
+        Ok(self.search(msg.0))
     }
 }
