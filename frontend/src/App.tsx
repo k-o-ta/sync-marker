@@ -3,6 +3,8 @@ import logo from './logo.svg';
 import './App.css';
 import ApolloClient, {gql} from 'apollo-boost';
 import { ApolloProvider } from '@apollo/react-hooks';
+import Login from "./Login";
+import CreateUser from "./CreateUser";
 
 const client = new ApolloClient({
   uri: 'http://localhost:3000/graphql',
@@ -28,6 +30,8 @@ client
 const App: React.FC = () => {
   return (
     <ApolloProvider client={client}>
+      <Login></Login>
+      <CreateUser/>
       <div className="App">
         <header className="App-header">
           <img src={logo} className="App-logo" alt="logo" />
