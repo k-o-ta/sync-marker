@@ -10,14 +10,22 @@ use tokio::prelude::*;
 
 impl InMemoryBookmarksRepository {
     pub fn new() -> Self {
-        InMemoryBookmarksRepository(Vec::new())
+        InMemoryBookmarksRepository(vec![Bookmark {
+            id: 1,
+            user_id: 1,
+            book_id: 1,
+            page_in_progress: 20,
+        }])
     }
     fn find_by_user_id(&self, user_id: u32) -> Vec<Bookmark> {
-        self.0
+        let mut bookmarks: Vec<Bookmark> = self
+            .0
             .iter()
             .filter(|bookmark| bookmark.user_id == user_id)
             .map(|bookmark| bookmark.clone())
-            .collect()
+            .collect();
+        bookmarks.sort_by_key(|bookmark| bookmark.book_id);
+        bookmarks
     }
 }
 
@@ -321,7 +329,7 @@ pub struct Bookmark {
     id: u64,
     user_id: u32,
     pub book_id: u32,
-    page_in_progress: u16,
+    pub page_in_progress: u16,
 }
 impl Actor for InMemoryBookmarksRepository {
     type Context = Context<Self>;

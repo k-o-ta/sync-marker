@@ -1,4 +1,4 @@
-use super::bookmark::{FindByUserId as FindBookmarksByUserId, InMemoryBookmarksRepository};
+use super::bookmark::{Bookmark, FindByUserId as FindBookmarksByUserId, InMemoryBookmarksRepository};
 
 use super::bookshelf::{Book, FindById as FindBooksById, InMemoryBooksRepository};
 use super::session::SessionDigest;
@@ -140,12 +140,12 @@ pub struct FindBooks {
     pub user_id: u32,
 }
 impl Message for FindBooks {
-    type Result = Result<Vec<Book>, io::Error>;
+    type Result = Result<Vec<(Book, Bookmark)>, io::Error>;
 }
 
 impl Handler<FindBooks> for InMemoryUsersRepository {
     // type Result = Option<Vec<Book>>;
-    type Result = ResponseFuture<Vec<Book>, io::Error>;
+    type Result = ResponseFuture<Vec<(Book, Bookmark)>, io::Error>;
     fn handle(&mut self, msg: FindBooks, _ctx: &mut Context<Self>) -> Self::Result {
         match msg {
             FindBooks {
@@ -171,11 +171,18 @@ impl Handler<FindBooks> for InMemoryUsersRepository {
                     .send(FindBookmarksByUserId(user_id))
                     .map_err(|e| Error::new(ErrorKind::Other, "oh no!"))
                     .and_then(move |bookmarks| {
+                        let bookmarks2 = bookmarks.unwrap();
                         books_repository
                             .send(FindBooksById(
-                                bookmarks.unwrap().iter().map(|bookmark| bookmark.book_id).collect(),
+                                bookmarks2.iter().map(|bookmark| bookmark.book_id).collect(),
                             ))
-                            .map(move |books| books.unwrap())
+                            .map(move |books| {
+                                // println!("{:?}", bookmarks);
+                                let mut books = books.unwrap();
+                                books.sort_by_key(|book| book.id);
+                                books.into_iter().zip(bookmarks2).collect()
+                                // books.unwrap()
+                            })
                             .map_err(|e| Error::new(ErrorKind::Other, "oh no!"))
                     });
                 return Box::new(books);

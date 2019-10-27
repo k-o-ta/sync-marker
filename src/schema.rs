@@ -1,13 +1,15 @@
-use super::bookmark::{InMemoryBookmarksRepository, Progress};
-use super::bookshelf::BookInfo as TBookInfo;
+use super::bookmark::{Bookmark as TBookmark, InMemoryBookmarksRepository, Progress};
 use super::bookshelf::Isbn as TIsbn;
+use super::bookshelf::{Book as TBook, BookInfo as TBookInfo};
 use super::bookshelf::{BookInfoLocation, InMemoryBooksRepository, IsbnError};
-use super::session::{Add as AddSessionDigest, InMemorySessionsRepository, SessionDigest};
-use super::user::{AddUser, FindByUserInfo, InMemoryUsersRepository};
+use super::session::{Add as AddSessionDigest, FindUserId, InMemorySessionsRepository, SessionDigest};
+use super::user::{AddUser, FindBooks, FindByUserInfo, InMemoryUsersRepository};
 use actix::prelude::*;
 use actix::Addr;
 use actix_session::Session;
-use futures::Future;
+use failure;
+use futures::future;
+use futures::{future::Either, Future};
 use juniper::FieldError;
 use juniper::FieldResult;
 use juniper::RootNode;
@@ -56,6 +58,28 @@ impl TBookInfo {
     }
 }
 
+#[derive(GraphQLObject)]
+pub struct Bookmark {
+    title: String,
+    page_count: i32,
+    isbn: Isbn,
+    page_in_progress: i32,
+}
+impl Bookmark {
+    fn new(book: TBook, bookmark: TBookmark) -> Result<Self, failure::Error> {
+        if book.id != bookmark.book_id {
+            return Err(format_err!("internal error book_id didn't match"));
+        } else {
+            Ok(Bookmark {
+                title: book.title().to_string(),
+                page_count: book.page_count(),
+                isbn: Isbn::from(book.isbn()),
+                page_in_progress: bookmark.page_in_progress as i32,
+            })
+        }
+    }
+}
+
 pub struct Query;
 
 #[juniper::object(
@@ -93,6 +117,146 @@ impl Query {
             "isbn error",
             graphql_value!({"isbn_error": "isbn error"}),
         ))
+    }
+    fn logged_in(context: &Context) -> FieldResult<bool> {
+        if let Some(session_digest) = context.session_digest.borrow().0 {
+            let session_fut = context.sessions_repository_addr.send(FindUserId(session_digest));
+            let session = session_fut.wait();
+            match session {
+                Ok(result) => Ok(result.is_some()),
+                Err(err) => Err(FieldError::new(
+                    "session error",
+                    graphql_value!({"session_error": "cannot get session_digest2"}),
+                )),
+            }
+        // Ok(true)
+        } else {
+            Err(FieldError::new(
+                "session error",
+                graphql_value!({"session_error": "cannot get session_digest1"}),
+            ))
+        }
+    }
+    fn bookmarks(context: &Context) -> FieldResult<Vec<Bookmark>> {
+        if let Some(session_digest) = context.session_digest.borrow().0 {
+            let session = context
+                .sessions_repository_addr
+                .send(FindUserId(session_digest))
+                .map_err(|_| "error1");
+            let books = session.then(|user_id| {
+                let user_id2 = user_id.map_err(|err| "error2").and_then(|user_id| match user_id {
+                    Some(user_id) => Ok(user_id),
+                    None => Err("error3"),
+                });
+                match user_id2 {
+                    Ok(user_id) => Either::A(
+                        context
+                            .users_repository_addr
+                            .send(FindBooks {
+                                bookmarks_repository: context.bookmarks_repository_addr.clone(),
+                                books_repository: context.books_repository_addr.clone(),
+                                user_id,
+                            })
+                            .map_err(|_| "error5"),
+                    ),
+                    Err(err) => Either::B(future::err("erro4")),
+                }
+            });
+            // .then(|session| match session {
+            //     Ok(session) => {
+            //         if let Some(user_id) = session {
+            //             context
+            //                 .users_repository_addr
+            //                 .send(FindBooks {
+            //                     bookmarks_repository: context.bookmarks_repository_addr,
+            //                     books_repository: context.books_repository_addr,
+            //                     user_id,
+            //                 })
+            //                 .map_err(|_| "")
+            //         } else {
+            //             future::err("")
+            //         }
+            //     }
+            //     Err(err) => future::err(""),
+            // });
+            // .map_err(|_| {
+            //     Err(FieldError::new(
+            //         "session error",
+            //         graphql_value!({"session_error": "cannot get session_digest2"}),
+            //     ))
+            // })
+            // .then(|session| match session {
+            //     Ok(seession) => match session {
+            //         Ok(user_id) => match user_id.clone() {
+            //             Some(user_id) => context.users_repository_addr.send(FindBooks {
+            //                 bookmarks_repository: context.bookmarks_repository_addr,
+            //                 books_repository: context.books_repository_addr,
+            //                 user_id,
+            //             }),
+            //             None => Err(FieldError::new(
+            //                 "bookmarks",
+            //                 graphql_value!({"bookmarks_error": "error1"}),
+            //             )),
+            //         },
+            //         Err(err) => Err(FieldError::new(
+            //             "bookmarks",
+            //             graphql_value!({"bookmarks_error": "error1"}),
+            //         )),
+            //     },
+            //     Err(err) => Err(FieldError::new(
+            //         "bookmarks",
+            //         graphql_value!({"bookmarks_error": "error1"}),
+            //     )),
+            // });
+            // hoge.wait();
+            Ok(books
+                .wait()
+                .unwrap()
+                .unwrap()
+                .into_iter()
+                .map(|book| Bookmark::new(book.0, book.1).unwrap())
+                .collect())
+        // Ok(Vec::new())
+
+        // let session_fut = context.sessions_repository_addr.send(FindUserId(session_digest));
+        // let session = session_fut.wait();
+        // match session {
+        //     Ok(result) => match result {
+        //         Some(user_id) => {
+        //             let bookmarks_future = context.users_repository_addr.send(FindBooks {
+        //                 bookmarks_repository: context.bookmarks_repository_addr,
+        //                 books_repository: context.books_repository_addr,
+        //                 user_id,
+        //             });
+        //             let bookmarks = bookmarks_future.wait();
+        //             match bookmarks {
+        //                 Ok(bookmarks) => match bookmarks {
+        //                     Ok(bookmarks) => Ok(bookmarks),
+        //                     Err(err) => Err(FieldError::new(
+        //                         "bookmarks",
+        //                         graphql_value!({"bookmarks_error": "error2"}),
+        //                     )),
+        //                 },
+        //                 Err(err) => Err(FieldError::new(
+        //                     "bookmarks",
+        //                     graphql_value!({"bookmarks_error": "error1"}),
+        //                 )),
+        //             }
+        //         }
+        //         None => Ok(Vec::new()),
+        //     },
+        //     Err(err) => Err(FieldError::new(
+        //         "session error",
+        //         graphql_value!({"session_error": "cannot get session_digest2"}),
+        //     )),
+        // }
+        // Ok(true)
+        } else {
+            Err(FieldError::new(
+                "session error",
+                graphql_value!({"session_error": "cannot get session_digest1"}),
+            ))
+        }
     }
 }
 
