@@ -3,7 +3,7 @@ import { useMutation } from '@apollo/react-hooks';
 import {gql} from "apollo-boost";
 
 const LOGIN = gql`
-  mutation {
+  mutation Login{
     login(email: "foo@example.com", password: "123abcdef")
   }
 `;
