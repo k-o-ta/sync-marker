@@ -12,6 +12,7 @@ import {LoggedInQuery as TLoggedInQuery} from './queries/__generated__/LoggedInQ
 import { LoggedInContext } from "./LoggedInContext";
 import {useLoggedIn} from "./LoggedInHook";
 import Signin from "./Signin";
+import Contents from "./Contents";
 
 const client = new ApolloClient({
   uri: 'http://localhost:3000/graphql',
@@ -52,6 +53,7 @@ const App: React.FC = () => {
               {/*  }}}>*/}
               <LoggedInContext.Provider value={loggedIn}>
                 <Signin></Signin>
+                <Contents/>
                 {/*<Login></Login>*/}
                 {/*<CreateUser/>*/}
                 <div className="App">

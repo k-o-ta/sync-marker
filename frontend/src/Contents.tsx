@@ -8,11 +8,12 @@ import Login from "./Login";
 import CreateUser from "./CreateUser";
 import loggedInQuery from "./queries/loggedInQuery";
 import Bookmarks from "./Bookmarks";
+import {LoggedInContext} from "./LoggedInContext";
 // import {LoggedInContext} from "./App";
 //
 //
-// const Contents: React.FC = () => {
-//   const loggedIn = useContext(LoggedInContext);
+const Contents: React.FC = () => {
+  const { loggedIn } = useContext(LoggedInContext);
 //   // const [loggedIn, setLoggedIn] = useState(false);
 //   const { loading, data } = useQuery<TLoggedInQuery>(
 //       loggedInQuery,
@@ -21,11 +22,12 @@ import Bookmarks from "./Bookmarks";
 //
 //   if (loading) return <p>Loading...</p>
 //
-//   return (
-//       <div>
-//         {loggedIn} ? <Bookmarks/> : <Login/><CreateUser/>
-//       </div>
-//   )
-// };
-//
-// export default Contents;
+  return (
+      <div>
+        { console.log("contents: ", loggedIn)}
+        {loggedIn && <Bookmarks/> }
+      </div>
+  )
+};
+
+export default Contents;
