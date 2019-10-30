@@ -1,7 +1,6 @@
 #[macro_use]
 extern crate failure;
 
-#[macro_use]
 extern crate actix;
 
 use actix::*;
@@ -92,7 +91,13 @@ fn graphql(
     .map_err(Error::from)
     .and_then(move |user| {
         if user.1.session_digest.borrow_mut().1 {
-            session.set("session_digest", user.1.session_digest.borrow_mut().0.as_ref());
+            match session.set("session_digest", user.1.session_digest.borrow_mut().0.as_ref()) {
+                Err(e) => {
+                    println!("session set error: {}", e);
+                    return Ok(HttpResponse::Forbidden().body("session error"));
+                }
+                _ => {}
+            }
         }
         Ok(HttpResponse::Ok().content_type("application/json").body(user.0))
     })
