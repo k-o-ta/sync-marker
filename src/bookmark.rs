@@ -326,7 +326,7 @@ enum ProgressBookmarkRepositoryError {
 }
 #[derive(Debug, Clone)]
 pub struct Bookmark {
-    id: u64,
+    pub id: u32,
     user_id: u32,
     pub book_id: u32,
     pub page_in_progress: u16,

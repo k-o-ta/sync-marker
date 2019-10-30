@@ -60,6 +60,7 @@ impl TBookInfo {
 
 #[derive(GraphQLObject)]
 pub struct Bookmark {
+    id: i32,
     title: String,
     page_count: i32,
     isbn: Isbn,
@@ -71,6 +72,7 @@ impl Bookmark {
             return Err(format_err!("internal error book_id didn't match"));
         } else {
             Ok(Bookmark {
+                id: bookmark.id as i32,
                 title: book.title().to_string(),
                 page_count: book.page_count(),
                 isbn: Isbn::from(book.isbn()),

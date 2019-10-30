@@ -15,7 +15,7 @@ const Bookmarks: React.FC = () => {
       <div>
         <ul>
           {data && data.bookmarks.map(bookmark => (
-            <li>{bookmark.title}</li>
+            <li key={bookmark.id}>{bookmark.title}</li>
           ))}
         </ul>
       </div>

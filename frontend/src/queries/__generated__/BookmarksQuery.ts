@@ -13,6 +13,7 @@ export interface BookmarksQuery_bookmarks_isbn {
 
 export interface BookmarksQuery_bookmarks {
   __typename: "Bookmark";
+  id: number;
   title: string;
   pageCount: number;
   isbn: BookmarksQuery_bookmarks_isbn;
