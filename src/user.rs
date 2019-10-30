@@ -93,15 +93,15 @@ pub struct AddUser {
 }
 
 impl Message for AddUser {
-    type Result = Result<bool, io::Error>;
+    type Result = Result<bool, AddUserRepositoryError>;
 }
 
 impl Handler<AddUser> for InMemoryUsersRepository {
-    type Result = Result<bool, io::Error>;
+    type Result = Result<bool, AddUserRepositoryError>;
     fn handle(&mut self, msg: AddUser, _ctx: &mut Context<Self>) -> Self::Result {
         println!("hadle Add");
-        self.add(msg.email, msg.password);
-        Ok(true)
+        self.add(msg.email, msg.password).map(|_| true)
+        // Ok(true)
     }
 }
 pub struct FindByUserInfo {
@@ -137,13 +137,14 @@ pub struct FindBooks {
     pub books_repository: Addr<InMemoryBooksRepository>,
     pub user_id: u32,
 }
+
 impl Message for FindBooks {
-    type Result = Result<Vec<(Book, Bookmark)>, io::Error>;
+    type Result = Result<Vec<(Book, Bookmark)>, actix::MailboxError>;
 }
 
 impl Handler<FindBooks> for InMemoryUsersRepository {
     // type Result = Option<Vec<Book>>;
-    type Result = ResponseFuture<Vec<(Book, Bookmark)>, io::Error>;
+    type Result = ResponseFuture<Vec<(Book, Bookmark)>, actix::MailboxError>;
     fn handle(&mut self, msg: FindBooks, _ctx: &mut Context<Self>) -> Self::Result {
         match msg {
             FindBooks {
@@ -153,21 +154,19 @@ impl Handler<FindBooks> for InMemoryUsersRepository {
             } => {
                 let books = bookmarks_repository
                     .send(FindBookmarksByUserId(user_id))
-                    .map_err(|e| Error::new(ErrorKind::Other, "oh no!"))
                     .and_then(move |bookmarks| {
-                        let bookmarks2 = bookmarks.unwrap();
+                        let bookmarks = bookmarks.expect("never fail");
                         books_repository
                             .send(FindBooksById(
-                                bookmarks2.iter().map(|bookmark| bookmark.book_id).collect(),
+                                bookmarks.iter().map(|bookmark| bookmark.book_id).collect(),
                             ))
                             .map(move |books| {
                                 // println!("{:?}", bookmarks);
                                 let mut books = books.unwrap();
                                 books.sort_by_key(|book| book.id);
-                                books.into_iter().zip(bookmarks2).collect()
+                                books.into_iter().zip(bookmarks).collect()
                                 // books.unwrap()
                             })
-                            .map_err(|e| Error::new(ErrorKind::Other, "oh no!"))
                     });
                 return Box::new(books);
             }

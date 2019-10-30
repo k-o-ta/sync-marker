@@ -3,6 +3,7 @@ use super::session::{FindUserId, InMemorySessionsRepository, SessionDigest};
 use super::user::{FindById, InMemoryUsersRepository};
 use actix::prelude::*;
 use actix::Addr;
+use futures::future::ok as FutureOk;
 use futures::Future;
 use std::io;
 
@@ -467,13 +468,15 @@ impl Handler<Progress> for InMemoryBookmarksRepository {
         Ok(())
     }
 }
+#[derive(Debug)]
+pub struct Never;
 
 pub struct FindByUserId(pub u32);
 impl Message for FindByUserId {
-    type Result = Result<Vec<Bookmark>, io::Error>;
+    type Result = Result<Vec<Bookmark>, Never>;
 }
 impl Handler<FindByUserId> for InMemoryBookmarksRepository {
-    type Result = Result<Vec<Bookmark>, io::Error>;
+    type Result = Result<Vec<Bookmark>, Never>;
     fn handle(&mut self, msg: FindByUserId, _ctx: &mut Context<Self>) -> Self::Result {
         Ok(self.find_by_user_id(msg.0))
     }
