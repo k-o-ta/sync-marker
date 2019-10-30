@@ -2,10 +2,8 @@ use super::bookshelf::{FindByIsbn, InMemoryBooksRepository, Isbn};
 use super::session::{FindUserId, InMemorySessionsRepository, SessionDigest};
 use super::user::{FindById, InMemoryUsersRepository};
 use actix::prelude::*;
-use actix::Addr;
-use futures::future::ok as FutureOk;
-use futures::Future;
-use std::io;
+use actix::{Addr, MailboxError};
+use futures::{future, future::Either, Future};
 
 impl InMemoryBookmarksRepository {
     pub fn new() -> Self {
@@ -313,7 +311,7 @@ impl BookmarksRepository for InMemoryBookmarksRepository {
 }
 
 #[derive(Fail, Debug)]
-enum ProgressBookmarkRepositoryError {
+pub enum ProgressBookmarkRepositoryError {
     #[fail(display = "Session Not Found")]
     SessionNotFoundError,
     #[fail(display = "User Not Found")]
@@ -322,6 +320,8 @@ enum ProgressBookmarkRepositoryError {
     BookNotFoundError(Isbn),
     #[fail(display = "page_cuont max is {}, but entered {}", _1, _0)]
     PageCountOverFlowError(u16, u16),
+    #[fail(display = "Acctor Error")]
+    ActorError(MailboxError),
 }
 #[derive(Debug, Clone)]
 pub struct Bookmark {
@@ -351,13 +351,13 @@ pub struct Progress {
 }
 
 impl Message for Progress {
-    type Result = Result<(), io::Error>;
+    type Result = Result<(), ProgressBookmarkRepositoryError>;
     // type Result = Result<BookAndLocation, ReqwestError>;
 }
 
 impl Handler<Progress> for InMemoryBookmarksRepository {
-    type Result = Result<(), io::Error>;
-    // type Result = ResponseFuture<(), io::Error>;
+    // type Result = Result<(), ProgressBookmarkRepositoryError>;
+    type Result = ResponseActFuture<Self, (), ProgressBookmarkRepositoryError>;
     fn handle(&mut self, msg: Progress, ctx: &mut Context<Self>) -> Self::Result {
         match msg {
             Progress {
@@ -368,54 +368,77 @@ impl Handler<Progress> for InMemoryBookmarksRepository {
                 users_repository,
                 books_repository,
             } => {
-                let session = sessions_repository.send(FindUserId(session_digest));
-                let user = session.and_then(move |user_id| {
-                    println!("{:?}", user_id);
-                    user_id.map(|user_id| users_repository.send(FindById(user_id)))
+                let session = sessions_repository
+                    .send(FindUserId(session_digest))
+                    .map_err(|e| ProgressBookmarkRepositoryError::ActorError(e));
+                // .map_err(|_| "e");
+                let user = session.and_then(move |user_id| match user_id {
+                    Some(user_id) => Either::A(
+                        users_repository
+                            .send(FindById(user_id))
+                            .map_err(|e| ProgressBookmarkRepositoryError::ActorError(e)),
+                    ),
+                    None => Either::B(future::err(ProgressBookmarkRepositoryError::SessionNotFoundError)),
                 });
-                let book = books_repository.send(FindByIsbn(isbn));
-                let user_and_book = user
-                    .join(book)
-                    .into_actor(self)
-                    .then(move |res, act, ctx| {
-                        match res {
-                            Ok((user, book)) => match (user, book) {
-                                (Some(Some(user)), Some(book)) => {
-                                    if let Some(bookmark) = act
-                                        .0
-                                        .iter_mut()
-                                        .find(|bookmark| bookmark.user_id == user.id && bookmark.book_id == book.id)
-                                    {
-                                        bookmark.page_in_progress = page_in_progress
+                // let user = session.then(move |user_id| match user_id {
+                //     Ok(user_id) => match user_id {
+                //         Some(user_id) => Either::A(users_repository.send(FindById(user_id))),
+                //         None => Either::B(future::err(ProgressBookmarkRepositoryError::SessionNotFoundError)),
+                //     },
+                //     Err(e) => Either::B(future::err(ProgressBookmarkRepositoryError::SessionNotFoundError)),
+                // });
+                let book = books_repository
+                    .send(FindByIsbn(isbn))
+                    .map_err(|e| ProgressBookmarkRepositoryError::ActorError(e));
+                let user_book = user.join(book).into_actor(self).then(move |res, act, ctx| {
+                    match res {
+                        Ok((user, book)) => match (user, book) {
+                            (Some(user), Some(book)) => {
+                                if let Some(bookmark) = act
+                                    .0
+                                    .iter_mut()
+                                    .find(|bookmark| bookmark.user_id == user.id && bookmark.book_id == book.id)
+                                {
+                                    bookmark.page_in_progress = page_in_progress
+                                } else {
+                                    let latest_bookmark = act.0.iter().max_by_key(|bookmark| bookmark.id);
+                                    let bookmark = if let Some(latest_bookmark) = latest_bookmark {
+                                        Bookmark {
+                                            id: latest_bookmark.id + 1,
+                                            user_id: user.id,
+                                            book_id: book.id,
+                                            page_in_progress,
+                                        }
                                     } else {
-                                        let latest_bookmark = act.0.iter().max_by_key(|bookmark| bookmark.id);
-                                        let bookmark = if let Some(latest_bookmark) = latest_bookmark {
-                                            Bookmark {
-                                                id: latest_bookmark.id + 1,
-                                                user_id: user.id,
-                                                book_id: book.id,
-                                                page_in_progress,
-                                            }
-                                        } else {
-                                            Bookmark {
-                                                id: 1,
-                                                user_id: user.id,
-                                                book_id: book.id,
-                                                page_in_progress,
-                                            }
-                                        };
-                                        act.0.push(bookmark)
-                                    }
-                                    println!("{:?}", act.0);
+                                        Bookmark {
+                                            id: 1,
+                                            user_id: user.id,
+                                            book_id: book.id,
+                                            page_in_progress,
+                                        }
+                                    };
+                                    act.0.push(bookmark)
                                 }
-                                _ => {}
-                            },
-                            Err(err) => ctx.stop(),
+                                println!("{:?}", act.0);
+                                fut::ok(())
+                            }
+                            // (None, _) => fut::err(()),
+                            (None, _) => fut::err(ProgressBookmarkRepositoryError::UserNotFoundError),
+                            (_, None) => fut::err(ProgressBookmarkRepositoryError::UserNotFoundError),
+                            _ => fut::ok(()),
+                        },
+                        Err(err) => {
+                            ctx.stop();
+                            fut::err(err)
+                            // fut::ok(())
                         }
-                        println!("inner");
-                        fut::ok(())
-                    })
-                    .wait(ctx);
+                    }
+                    // println!("inner");
+                    // fut::ok(())
+                });
+                return Box::new(user_book);
+                // user_book.wait(ctx);
+                // user_book.wait();
             }
         }
         // let session = msg.sessions_repository.send(FindUserId(msg.session_digest));
@@ -465,7 +488,7 @@ impl Handler<Progress> for InMemoryBookmarksRepository {
         //     book_id: 1,
         //     page_in_progress: 1,
         // });
-        Ok(())
+        // Ok(())
     }
 }
 #[derive(Debug)]
