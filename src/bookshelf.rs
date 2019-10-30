@@ -2,16 +2,13 @@ use actix::prelude::*;
 use failure::Error;
 use futures::future::ok as FutureOk;
 use futures::future::FutureResult;
-use futures::{Async, Future, Poll};
+use futures::Future;
 use reqwest::r#async::Client as AsyncClient;
-use reqwest::r#async::Response as AsyncResponse;
 use reqwest::Error as ReqwestError;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::io;
-use tokio::prelude::*;
 
 // GoogleBooksAPI
 #[derive(Serialize, Deserialize, Debug)]
@@ -196,10 +193,10 @@ fn search_from_isbn(isbn: Isbn) -> impl futures::future::Future<Item = BookInfo,
 // Actor
 impl Actor for InMemoryBooksRepository {
     type Context = Context<Self>;
-    fn started(&mut self, ctx: &mut Context<Self>) {
+    fn started(&mut self, _ctx: &mut Context<Self>) {
         println!("BooksRepository Actor is alive");
     }
-    fn stopped(&mut self, ctx: &mut Context<Self>) {
+    fn stopped(&mut self, _ctx: &mut Context<Self>) {
         println!("BooksRepository Actor is stopped");
     }
 }
@@ -291,31 +288,14 @@ impl Handler<SearchFromIsbn> for InMemoryBooksRepository {
 
 impl InMemoryBooksRepository {
     pub fn new() -> Self {
-        InMemoryBooksRepository(vec![
-            Book {
-                id: 1,
-                info: BookInfo {
-                    title: "実践Rust入門".to_owned(),
-                    page_count: 576,
-                    isbn: Isbn::new(9784297105594).expect("invalid isbn"),
-                },
-            }, // Book {
-               //     id: 1,
-               //     info: BookInfo {
-               //         title: "a".to_owned(),
-               //         page_count: 100,
-               //         isbn: Isbn::new(9784797321943).expect("invalid isbn"),
-               //     },
-               // },
-               // Book {
-               //     id: 2,
-               //     info: BookInfo {
-               //         title: "b".to_owned(),
-               //         page_count: 200,
-               //         isbn: Isbn::new(9780000000001).expect("invalid isbn"),
-               //     },
-               // },
-        ])
+        InMemoryBooksRepository(vec![Book {
+            id: 1,
+            info: BookInfo {
+                title: "実践Rust入門".to_owned(),
+                page_count: 576,
+                isbn: Isbn::new(9784297105594).expect("invalid isbn"),
+            },
+        }])
     }
     fn search(&self, ids: Vec<u32>) -> Vec<Book> {
         self.0

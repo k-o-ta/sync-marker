@@ -1,17 +1,6 @@
 use actix::prelude::*;
-use failure::Error;
-use futures::future::ok as FutureOk;
-use futures::future::FutureResult;
-use futures::{Async, Future, Poll};
-use reqwest::r#async::Client as AsyncClient;
-use reqwest::r#async::Response as AsyncResponse;
-use reqwest::Error as ReqwestError;
-use reqwest::Url;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::convert::TryFrom;
 use std::io;
-use tokio::prelude::*;
 
 pub type SessionDigest = [u8; 20];
 trait SessionsRepository {
@@ -39,10 +28,10 @@ impl SessionsRepository for InMemorySessionsRepository {
 impl Actor for InMemorySessionsRepository {
     type Context = Context<Self>;
     #[cfg(debug_assertions)]
-    fn started(&mut self, ctx: &mut Context<Self>) {
+    fn started(&mut self, _ctx: &mut Context<Self>) {
         println!("SessionRepository Actor is alive");
     }
-    fn stopped(&mut self, ctx: &mut Context<Self>) {
+    fn stopped(&mut self, _ctx: &mut Context<Self>) {
         println!("SessionsRepository Actor is stopped");
     }
 }

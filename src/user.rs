@@ -1,11 +1,9 @@
 use super::bookmark::{Bookmark, FindByUserId as FindBookmarksByUserId, InMemoryBookmarksRepository};
 
 use super::bookshelf::{Book, FindById as FindBooksById, InMemoryBooksRepository};
-use super::session::SessionDigest;
 use actix::prelude::*;
 use std::io;
 use std::io::{Error, ErrorKind};
-use tokio::prelude::*;
 
 pub trait UsersRepository {
     fn add(&mut self, email: String, password: String) -> Result<(), AddUserRepositoryError>;
@@ -62,7 +60,7 @@ pub struct User {
 }
 
 #[derive(Fail, Debug)]
-enum AddUserRepositoryError {
+pub enum AddUserRepositoryError {
     #[fail(display = "the email address have been already taken: {}", _0)]
     DuplicatedUserError(String),
 }
@@ -79,10 +77,10 @@ impl InMemoryUsersRepository {
 
 impl Actor for InMemoryUsersRepository {
     type Context = Context<Self>;
-    fn started(&mut self, ctx: &mut Context<Self>) {
+    fn started(&mut self, _ctx: &mut Context<Self>) {
         println!("UsersRepository Actor is alive");
     }
-    fn stopped(&mut self, ctx: &mut Context<Self>) {
+    fn stopped(&mut self, _ctx: &mut Context<Self>) {
         println!("UsersRepository Actor is stopped");
     }
 }
@@ -153,20 +151,6 @@ impl Handler<FindBooks> for InMemoryUsersRepository {
                 books_repository,
                 user_id,
             } => {
-                // let bookmarks = bookmarks_repository
-                //     .send(FindBookmarksByUserId(user_id))
-                //     .map_err(|e| eprintln!("{:?}", e));
-                // let books = bookmarks.and_then(move |bookmarks| {
-                //     bookmarks.map(|bookmarks| {
-                //         books_repository
-                //             .send(FindBooksById(
-                //                 bookmarks.iter().map(|bookmark| bookmark.book_id).collect(),
-                //             ))
-                //             .map(move |_| ())
-                //             .map_err(|_| ())
-                //     });
-                // });
-                //
                 let books = bookmarks_repository
                     .send(FindBookmarksByUserId(user_id))
                     .map_err(|e| Error::new(ErrorKind::Other, "oh no!"))

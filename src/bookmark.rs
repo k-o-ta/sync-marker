@@ -1,12 +1,10 @@
-use super::bookshelf::{Book, BooksRepository, FindByIsbn, InMemoryBooksRepository, Isbn};
+use super::bookshelf::{FindByIsbn, InMemoryBooksRepository, Isbn};
 use super::session::{FindUserId, InMemorySessionsRepository, SessionDigest};
-use super::user::{FindById, InMemoryUsersRepository, User, UsersRepository};
+use super::user::{FindById, InMemoryUsersRepository};
 use actix::prelude::*;
 use actix::Addr;
-use futures::future::ok as FutureOk;
 use futures::Future;
 use std::io;
-use tokio::prelude::*;
 
 impl InMemoryBookmarksRepository {
     pub fn new() -> Self {

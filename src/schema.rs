@@ -1,22 +1,18 @@
 use super::bookmark::{Bookmark as TBookmark, InMemoryBookmarksRepository, Progress};
+use super::bookshelf::InMemoryBooksRepository;
 use super::bookshelf::Isbn as TIsbn;
 use super::bookshelf::{Book as TBook, BookInfo as TBookInfo};
-use super::bookshelf::{BookInfoLocation, InMemoryBooksRepository, IsbnError};
 use super::session::{Add as AddSessionDigest, FindUserId, InMemorySessionsRepository, SessionDigest};
 use super::user::{AddUser, FindBooks, FindByUserInfo, InMemoryUsersRepository};
-use actix::prelude::*;
 use actix::Addr;
-use actix_session::Session;
 use failure;
 use futures::future;
 use futures::{future::Either, Future};
 use juniper::FieldError;
 use juniper::FieldResult;
 use juniper::RootNode;
-use std::borrow::BorrowMut;
 use std::cell::RefCell;
 use std::convert::TryFrom;
-use std::sync::Arc;
 
 pub struct Context {
     pub books_repository_addr: Addr<InMemoryBooksRepository>,
@@ -164,53 +160,6 @@ impl Query {
                     Err(err) => Either::B(future::err("erro4")),
                 }
             });
-            // .then(|session| match session {
-            //     Ok(session) => {
-            //         if let Some(user_id) = session {
-            //             context
-            //                 .users_repository_addr
-            //                 .send(FindBooks {
-            //                     bookmarks_repository: context.bookmarks_repository_addr,
-            //                     books_repository: context.books_repository_addr,
-            //                     user_id,
-            //                 })
-            //                 .map_err(|_| "")
-            //         } else {
-            //             future::err("")
-            //         }
-            //     }
-            //     Err(err) => future::err(""),
-            // });
-            // .map_err(|_| {
-            //     Err(FieldError::new(
-            //         "session error",
-            //         graphql_value!({"session_error": "cannot get session_digest2"}),
-            //     ))
-            // })
-            // .then(|session| match session {
-            //     Ok(seession) => match session {
-            //         Ok(user_id) => match user_id.clone() {
-            //             Some(user_id) => context.users_repository_addr.send(FindBooks {
-            //                 bookmarks_repository: context.bookmarks_repository_addr,
-            //                 books_repository: context.books_repository_addr,
-            //                 user_id,
-            //             }),
-            //             None => Err(FieldError::new(
-            //                 "bookmarks",
-            //                 graphql_value!({"bookmarks_error": "error1"}),
-            //             )),
-            //         },
-            //         Err(err) => Err(FieldError::new(
-            //             "bookmarks",
-            //             graphql_value!({"bookmarks_error": "error1"}),
-            //         )),
-            //     },
-            //     Err(err) => Err(FieldError::new(
-            //         "bookmarks",
-            //         graphql_value!({"bookmarks_error": "error1"}),
-            //     )),
-            // });
-            // hoge.wait();
             Ok(books
                 .wait()
                 .unwrap()
@@ -218,41 +167,6 @@ impl Query {
                 .into_iter()
                 .map(|book| Bookmark::new(book.0, book.1).unwrap())
                 .collect())
-        // Ok(Vec::new())
-
-        // let session_fut = context.sessions_repository_addr.send(FindUserId(session_digest));
-        // let session = session_fut.wait();
-        // match session {
-        //     Ok(result) => match result {
-        //         Some(user_id) => {
-        //             let bookmarks_future = context.users_repository_addr.send(FindBooks {
-        //                 bookmarks_repository: context.bookmarks_repository_addr,
-        //                 books_repository: context.books_repository_addr,
-        //                 user_id,
-        //             });
-        //             let bookmarks = bookmarks_future.wait();
-        //             match bookmarks {
-        //                 Ok(bookmarks) => match bookmarks {
-        //                     Ok(bookmarks) => Ok(bookmarks),
-        //                     Err(err) => Err(FieldError::new(
-        //                         "bookmarks",
-        //                         graphql_value!({"bookmarks_error": "error2"}),
-        //                     )),
-        //                 },
-        //                 Err(err) => Err(FieldError::new(
-        //                     "bookmarks",
-        //                     graphql_value!({"bookmarks_error": "error1"}),
-        //                 )),
-        //             }
-        //         }
-        //         None => Ok(Vec::new()),
-        //     },
-        //     Err(err) => Err(FieldError::new(
-        //         "session error",
-        //         graphql_value!({"session_error": "cannot get session_digest2"}),
-        //     )),
-        // }
-        // Ok(true)
         } else {
             Err(FieldError::new(
                 "session error",
@@ -306,31 +220,26 @@ impl Mutation {
         }
     }
     fn login(mut context: &Context, email: String, password: String) -> FieldResult<bool> {
-        // (*context).session_digest = None;
-        // use rand::Rng;
         let res_future = context.users_repository_addr.send(FindByUserInfo { email, password });
         let res = res_future.wait();
         match res {
-            Ok(res) => {
-                match res {
-                    Some(res) => {
-                        use rand::{thread_rng, Rng};
-                        let mut arr = [0u8; 20];
-                        thread_rng().fill(&mut arr[..]);
-                        // let converted: String = String::from_utf8(arr.to_vec()).unwrap();
-                        let mut my_ref = context.session_digest.borrow_mut();
-                        *my_ref = (Some(arr.clone()), true);
+            Ok(res) => match res {
+                Some(res) => {
+                    use rand::{thread_rng, Rng};
+                    let mut arr = [0u8; 20];
+                    thread_rng().fill(&mut arr[..]);
+                    let mut my_ref = context.session_digest.borrow_mut();
+                    *my_ref = (Some(arr.clone()), true);
 
-                        let res_session_future = context.sessions_repository_addr.send(AddSessionDigest {
-                            session_digest: arr,
-                            user_id: res.id,
-                        });
-                        res_session_future.wait();
-                        Ok(true)
-                    }
-                    None => Ok(false),
+                    let res_session_future = context.sessions_repository_addr.send(AddSessionDigest {
+                        session_digest: arr,
+                        user_id: res.id,
+                    });
+                    res_session_future.wait();
+                    Ok(true)
                 }
-            }
+                None => Ok(false),
+            },
             Err(err) => {
                 return Err(FieldError::new(err, graphql_value!({"login": "login_error"})));
             }
