@@ -103,28 +103,7 @@ fn graphql(
     })
 }
 
-fn index(session: Session) -> impl Responder {
-    match session.get::<i32>("counter") {
-        Ok(count) => match count {
-            Some(count) => {
-                println!("SESSION value: {}", count);
-                session.set("counter", count + 1);
-            }
-            None => {
-                session.set("counter", 1);
-                dbg!("no counter");
-            }
-        },
-        Err(err) => {
-            dbg!("{}", err);
-        }
-    };
-    // if let Some(count) = session.get::<i32>("counter")? {
-    //     println!("SESSION value: {}", count);
-    //     session.set("counter", count + 1)?;
-    // } else {
-    //     session.set("counter", 1)?;
-    // }
+fn index(_session: Session) -> impl Responder {
     HttpResponse::Ok().body("Hello world!")
 }
 
