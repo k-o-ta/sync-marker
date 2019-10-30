@@ -319,7 +319,7 @@ pub enum ProgressBookmarkRepositoryError {
     #[fail(display = "Book Not Found")]
     BookNotFoundError(Isbn),
     #[fail(display = "page_cuont max is {}, but entered {}", _1, _0)]
-    PageCountOverFlowError(u16, u16),
+    PageCountOverFlowError(u16, i32),
     #[fail(display = "Acctor Error")]
     ActorError(MailboxError),
 }
@@ -332,10 +332,10 @@ pub struct Bookmark {
 }
 impl Actor for InMemoryBookmarksRepository {
     type Context = Context<Self>;
-    fn started(&mut self, ctx: &mut Context<Self>) {
+    fn started(&mut self, _ctx: &mut Context<Self>) {
         println!("BookmarksRepository Actor is alive");
     }
-    fn stopped(&mut self, ctx: &mut Context<Self>) {
+    fn stopped(&mut self, _ctx: &mut Context<Self>) {
         println!("BookmarksRepository Actor is stopped");
     }
 }
@@ -358,7 +358,7 @@ impl Message for Progress {
 impl Handler<Progress> for InMemoryBookmarksRepository {
     // type Result = Result<(), ProgressBookmarkRepositoryError>;
     type Result = ResponseActFuture<Self, (), ProgressBookmarkRepositoryError>;
-    fn handle(&mut self, msg: Progress, ctx: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, msg: Progress, _ctx: &mut Context<Self>) -> Self::Result {
         match msg {
             Progress {
                 isbn,
@@ -394,6 +394,12 @@ impl Handler<Progress> for InMemoryBookmarksRepository {
                     match res {
                         Ok((user, book)) => match (user, book) {
                             (Some(user), Some(book)) => {
+                                if page_in_progress as i32 > book.page_count() {
+                                    return fut::err(ProgressBookmarkRepositoryError::PageCountOverFlowError(
+                                        page_in_progress,
+                                        book.page_count(),
+                                    ));
+                                }
                                 if let Some(bookmark) = act
                                     .0
                                     .iter_mut()
@@ -424,8 +430,7 @@ impl Handler<Progress> for InMemoryBookmarksRepository {
                             }
                             // (None, _) => fut::err(()),
                             (None, _) => fut::err(ProgressBookmarkRepositoryError::UserNotFoundError),
-                            (_, None) => fut::err(ProgressBookmarkRepositoryError::UserNotFoundError),
-                            _ => fut::ok(()),
+                            (_, None) => fut::err(ProgressBookmarkRepositoryError::BookNotFoundError(isbn)),
                         },
                         Err(err) => {
                             ctx.stop();
