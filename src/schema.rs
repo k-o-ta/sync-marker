@@ -235,8 +235,12 @@ impl Mutation {
                         session_digest: arr,
                         user_id: res.id,
                     });
-                    res_session_future.wait();
-                    Ok(true)
+                    match res_session_future.wait() {
+                        Ok(session) => Ok(true),
+                        Err(e) => {
+                            return Err(FieldError::new(e, graphql_value!({"login": "login_error"})));
+                        }
+                    }
                 }
                 None => Ok(false),
             },
