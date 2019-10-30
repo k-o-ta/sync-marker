@@ -132,9 +132,6 @@ impl Isbn {
         }
         Ok(Isbn(isbn))
     }
-    pub fn code(&self) -> u64 {
-        self.0
-    }
 }
 
 #[derive(Fail, Debug)]
@@ -303,9 +300,6 @@ impl InMemoryBooksRepository {
             .filter(|book| ids.contains(&book.id))
             .map(|book| book.clone())
             .collect()
-    }
-    fn last(&self) -> Option<Book> {
-        self.0.last().and_then(|book| Some(book.clone()))
     }
 }
 pub struct FindByIsbn(pub Isbn);

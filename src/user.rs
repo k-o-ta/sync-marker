@@ -2,8 +2,6 @@ use super::bookmark::{Bookmark, FindByUserId as FindBookmarksByUserId, InMemoryB
 
 use super::bookshelf::{Book, FindById as FindBooksById, InMemoryBooksRepository};
 use actix::prelude::*;
-use std::io;
-use std::io::{Error, ErrorKind};
 
 pub trait UsersRepository {
     fn add(&mut self, email: String, password: String) -> Result<(), AddUserRepositoryError>;
