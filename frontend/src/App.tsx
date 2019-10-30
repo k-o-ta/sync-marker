@@ -9,6 +9,9 @@ import Bookmarks from "./Bookmarks";
 import bookmarksQuery from './queries/bookmarksQuery';
 import loggedInQuery from './queries/loggedInQuery';
 import {LoggedInQuery as TLoggedInQuery} from './queries/__generated__/LoggedInQuery';
+import { LoggedInContext } from "./LoggedInContext";
+import {useLoggedIn} from "./LoggedInHook";
+import Signin from "./Signin";
 
 const client = new ApolloClient({
   uri: 'http://localhost:3000/graphql',
@@ -31,18 +34,26 @@ client
 })
 .then(result => console.log(result));
 
-export const LoggedInContext = React.createContext(false);
+// export const LoggedInContext = React.createContext(false);
 const App: React.FC = () => {
   // const { loading, data } = useQuery<TLoggedInQuery>(
   //     loggedInQuery,
   //     {}
   // );
   // if (loading) return <p>Loading...</p>
+  // const [loggedIn, setLoggedInState] = React.useState(false);
+  const loggedIn = useLoggedIn();
+  // console.log("loggedIn?", loggedIn.loggedIn);
   return (
             <ApolloProvider client={client}>
-              <LoggedInContext.Provider value={false}>
-                <Login></Login>
-                <CreateUser/>
+              {/*<LoggedInContext.Provider value={{loggedIn: loggedIn, setLoggedIn: (loggedIn: boolean) => {*/}
+              {/*    console.log("set!", loggedIn);*/}
+              {/*    setLoggedInState(loggedIn)*/}
+              {/*  }}}>*/}
+              <LoggedInContext.Provider value={loggedIn}>
+                <Signin></Signin>
+                {/*<Login></Login>*/}
+                {/*<CreateUser/>*/}
                 <div className="App">
                   <header className="App-header">
                     <img src={logo} className="App-logo" alt="logo" />
