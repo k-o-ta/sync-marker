@@ -4,7 +4,7 @@ use super::bookshelf::Isbn as TIsbn;
 use super::bookshelf::{Book as TBook, BookInfo as TBookInfo};
 use super::session::{Add as AddSessionDigest, FindUserId, InMemorySessionsRepository, SessionDigest};
 use super::user::{AddUser, FindBooks, FindByUserInfo, InMemoryUsersRepository};
-use actix::Addr;
+use actix::{Addr, MailboxError};
 use failure;
 use futures::future;
 use futures::{future::Either, Future};
@@ -140,14 +140,10 @@ impl Query {
             let session = context
                 .sessions_repository_addr
                 .send(FindUserId(session_digest))
-                .map_err(|_| "error1");
-            let books = session.then(|user_id| {
-                let user_id2 = user_id.map_err(|err| "error2").and_then(|user_id| match user_id {
-                    Some(user_id) => Ok(user_id),
-                    None => Err("error3"),
-                });
-                match user_id2 {
-                    Ok(user_id) => Either::A(
+                .map_err(|e| BookmarksError::ActorError(e));
+            let books = session.and_then(|user_id| {
+                match user_id {
+                    Some(user_id) => Either::A(
                         context
                             .users_repository_addr
                             .send(FindBooks {
@@ -155,18 +151,48 @@ impl Query {
                                 books_repository: context.books_repository_addr.clone(),
                                 user_id,
                             })
-                            .map_err(|_| "error5"),
+                            .map_err(|e| BookmarksError::ActorError(e)),
                     ),
-                    Err(err) => Either::B(future::err("erro4")),
+                    None => Either::B(future::err(BookmarksError::SessionNotFoundError)),
                 }
+                // let user_id2 = user_id.map_err(|err| "error2").and_then(|user_id| match user_id {
+                //     Some(user_id) => Ok(user_id),
+                //     None => Err("error3"),
+                // });
+                // match user_id2 {
+                //     Ok(user_id) => Either::A(
+                //         context
+                //             .users_repository_addr
+                //             .send(FindBooks {
+                //                 bookmarks_repository: context.bookmarks_repository_addr.clone(),
+                //                 books_repository: context.books_repository_addr.clone(),
+                //                 user_id,
+                //             })
+                //             .map_err(|e| BookmarksError::ActorError(e)),
+                //     ),
+                //     Err(err) => Either::B(future::err(BookmarksError::SessionNotFoundError)),
+                // }
             });
-            Ok(books
+            books
                 .wait()
-                .unwrap()
-                .unwrap()
-                .into_iter()
-                .map(|book| Bookmark::new(book.0, book.1).unwrap())
-                .collect())
+                .map_err(|e| FieldError::new(e, graphql_value!({"bookmarks_error": "error1"})))
+                .and_then(|books| {
+                    books
+                        .map_err(|e| FieldError::new(e, graphql_value!({"bookmarks_error": "error1"})))
+                        .and_then(|books| {
+                            Ok(books
+                                .into_iter()
+                                .map(|book| Bookmark::new(book.0, book.1).unwrap())
+                                .collect())
+                        })
+                })
+        // Ok(books
+        //     .wait()
+        //     .unwrap()
+        //     .unwrap()
+        //     .into_iter()
+        //     .map(|book| Bookmark::new(book.0, book.1).unwrap())
+        //     .collect())
         } else {
             Err(FieldError::new(
                 "session error",
@@ -174,6 +200,16 @@ impl Query {
             ))
         }
     }
+}
+
+#[derive(Fail, Debug)]
+pub enum BookmarksError {
+    #[fail(display = "Session Not Found")]
+    SessionNotFoundError,
+    #[fail(display = "User Not Found")]
+    UserNotFoundError,
+    #[fail(display = "Acctor Error")]
+    ActorError(MailboxError),
 }
 
 pub struct Mutation;
