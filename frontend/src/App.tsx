@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useState} from 'react';
 import logo from './logo.svg';
 import './App.css';
 import ApolloClient, {gql} from 'apollo-boost';
@@ -43,15 +43,16 @@ const App: React.FC = () => {
   // );
   // if (loading) return <p>Loading...</p>
   // const [loggedIn, setLoggedInState] = React.useState(false);
-  const loggedIn = useLoggedIn();
+  // const loggedIn = useLoggedIn();
   // console.log("loggedIn?", loggedIn.loggedIn);
+  const [loggedInState, setLoggedIn] = useState(false);
   return (
             <ApolloProvider client={client}>
               {/*<LoggedInContext.Provider value={{loggedIn: loggedIn, setLoggedIn: (loggedIn: boolean) => {*/}
               {/*    console.log("set!", loggedIn);*/}
               {/*    setLoggedInState(loggedIn)*/}
               {/*  }}}>*/}
-              <LoggedInContext.Provider value={loggedIn}>
+              <LoggedInContext.Provider value={{loggedIn: loggedInState, setLoggedIn: setLoggedIn}}>
                 <Signin></Signin>
                 <Contents/>
                 {/*<Login></Login>*/}
