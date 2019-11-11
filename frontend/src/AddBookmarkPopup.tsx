@@ -1,14 +1,13 @@
-import React, {useContext, useState} from 'react';
+import React, {useState} from 'react';
 import {AddBookmarkPopupContext, AddBookmarkPopupStatus} from "./AddBookmarkPopupContext";
 import AddBookmarkPopupSearch from "./AddBookmarkPopupSearch";
 import AddBookmarkPopupAdd from "./AddBookmarkPopupAdd";
 import AddBookmarkPopupHide from "./AddBookmarkPopupHide";
 
 const AddBookmarkPopup: React.FC = () => {
-  const [addBookmarkState, setAddBookmarkState] = useState(AddBookmarkPopupStatus.hide);
-  // const addBookmarkPopupContext = useContext(AddBookmarkPopupContext);
+  const [addBookmarkState, setAddBookmarkState] = useState<{popup: AddBookmarkPopupStatus, isbn?: string}>({popup: AddBookmarkPopupStatus.hide, isbn: ""});
   let dom = (<AddBookmarkPopupHide/>);
-  switch (addBookmarkState) {
+  switch (addBookmarkState.popup) {
     case AddBookmarkPopupStatus.hide:
       dom = <AddBookmarkPopupHide/>;
       console.log("hide");
@@ -23,8 +22,8 @@ const AddBookmarkPopup: React.FC = () => {
       break;
   }
   return (
-      <AddBookmarkPopupContext.Provider value={{status: addBookmarkState, setStatus: setAddBookmarkState}}>
-        {dom}
+      <AddBookmarkPopupContext.Provider value={{status: addBookmarkState, setStatus: (popup: AddBookmarkPopupStatus, isbn?: string) => {setAddBookmarkState({popup, isbn})}}}>
+          {dom}
       </AddBookmarkPopupContext.Provider>
   )
 }

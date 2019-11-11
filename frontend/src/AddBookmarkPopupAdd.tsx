@@ -1,5 +1,11 @@
 import React, {useContext} from 'react';
-import {AddBookmarkPopupContext, AddBookmarkPopupStatus} from "./AddBookmarkPopupContext";
+import {BookFromIsbnQuery as TBookFromIsbnQuery} from './queries/__generated__/BookFromIsbnQuery';
+import searchBookFromIsbnQuery from "./queries/searchBookFromIsbnQuery";
+import {
+  AddBookmarkPopupContext,
+  AddBookmarkPopupStatus
+} from "./AddBookmarkPopupContext";
+import {useQuery} from "@apollo/react-hooks";
 const AddBookmarkPopupAdd: React.FC = () => {
   function handleSubmit(e: any) {
     e.preventDefault();
@@ -12,25 +18,37 @@ const AddBookmarkPopupAdd: React.FC = () => {
     width: '300px',
     height: '200px',
     position: "fixed",
-    'margin-left': '-150px',
-    'margin-top': '-100px',
-    'background-color': 'white',
-    'border-radius': '5px',
-    'text-align': 'center',
+    marginLeft: '-150px',
+    marginTop: '-100px',
+    backgroundColor: 'white',
+    borderRadius: '5px',
+    textAlign: 'center',
   };
+  const { loading, error, data } = useQuery<TBookFromIsbnQuery>(
+      searchBookFromIsbnQuery,
+      {
+        variables: {isbn: addBookmarkPopupContext.status.isbn!}
+      }
+  );
+
+  if (loading) return (<div>'Loading...'</div>);
+  if (error) return (<div>`Error! ${error.message}`</div>);
+
   return (
       <div style={popupStyle}>
-        <form onSubmit={handleSubmit}>
-          <label>
-            title:
-            <input type="text"/>
-          </label>
-          <label>
-            page:
-            <input type="text"/>
-          </label>
-          <button type="submit">Add</button>
-        </form>
+        {data && (
+            <form onSubmit={handleSubmit}>
+              <label>
+                title:
+                <input type="text" value={data.bookFromIsbn.name}/>
+              </label>
+              <label>
+                page:
+                <input type="text" value={data.bookFromIsbn.page}/>
+              </label>
+              <button type="submit">Add</button>
+            </form>
+        )}
       </div>
   )
 }

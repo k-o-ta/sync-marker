@@ -1,8 +1,8 @@
 import React from 'react';
 
 export interface IAddBookmarkPopupContext {
-  status: AddBookmarkPopupStatus;
-  setStatus: (status: AddBookmarkPopupStatus) => void;
+  status: {popup: AddBookmarkPopupStatus, isbn?: string};
+  setStatus: (popup: AddBookmarkPopupStatus, isbn?: string) => void;
 }
 
 export enum AddBookmarkPopupStatus {
@@ -12,8 +12,8 @@ export enum AddBookmarkPopupStatus {
 }
 
 export const AddBookmarkPopupContextDefaultValue = {
-  status: AddBookmarkPopupStatus.hide,
-  setStatus: (status: AddBookmarkPopupStatus) => {},
+  status: { popup: AddBookmarkPopupStatus.hide, isbn: undefined },
+  setStatus: (popup: AddBookmarkPopupStatus, isbn?: string) => {},
 }
 
 export const AddBookmarkPopupContext = React.createContext<IAddBookmarkPopupContext>(AddBookmarkPopupContextDefaultValue);

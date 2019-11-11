@@ -1,11 +1,18 @@
-import React, {useContext} from 'react';
-import {AddBookmarkPopupContext, AddBookmarkPopupStatus} from "./AddBookmarkPopupContext";
+import React, {useContext, useState} from 'react';
+import {
+  AddBookmarkPopupContext,
+  AddBookmarkPopupStatus
+} from "./AddBookmarkPopupContext";
 
 const AddBookmarkPopupSearch: React.FC = () => {
   const addBookmarkPopupContext = useContext(AddBookmarkPopupContext);
-  function handleSubmit(e: any) {
+  const [formIsbn, setIsbn] = useState("");
+  function handleChange(e:  React.ChangeEvent<HTMLInputElement>) {
+    setIsbn(e.target.value);
+  }
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    addBookmarkPopupContext.setStatus(AddBookmarkPopupStatus.add);
+    addBookmarkPopupContext.setStatus(AddBookmarkPopupStatus.add, formIsbn);
   }
 
   const popupStyle: { [key: string]: string } = {
@@ -14,18 +21,18 @@ const AddBookmarkPopupSearch: React.FC = () => {
     width: '300px',
     height: '200px',
     position: "fixed",
-    'margin-left': '-150px',
-    'margin-top': '-100px',
-    'background-color': 'white',
-    'border-radius': '5px',
-    'text-align': 'center',
+    marginLeft: '-150px',
+    marginTop: '-100px',
+    backgroundColor: 'white',
+    borderRadius: '5px',
+    textAlign: 'center',
   };
   return (
       <div style={popupStyle}>
         <form onSubmit={handleSubmit}>
           <label>
             ISBN13:
-            <input type="text"/>
+            <input type="text" value={formIsbn} onChange={handleChange} />
           </label>
           <button type="submit">Search</button>
         </form>
