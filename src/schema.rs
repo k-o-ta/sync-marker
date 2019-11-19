@@ -214,7 +214,7 @@ pub enum BookmarksError {
 
 #[derive(GraphQLObject)]
 pub struct Progress {
-    isbn: String,
+    id: i32,
     page_in_progress: i32,
 }
 
@@ -336,7 +336,7 @@ impl Mutation {
         match res {
             Ok(res) => match res {
                 Ok(res) => Ok(Progress {
-                    isbn: res.0.to_string(),
+                    id: res.0 as i32,
                     page_in_progress: res.1 as i32,
                 }),
                 Err(err) => {

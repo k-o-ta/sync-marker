@@ -351,13 +351,13 @@ pub struct Progress {
 }
 
 impl Message for Progress {
-    type Result = Result<(u64, u16), ProgressBookmarkRepositoryError>;
+    type Result = Result<(u32, u16), ProgressBookmarkRepositoryError>;
     // type Result = Result<BookAndLocation, ReqwestError>;
 }
 
 impl Handler<Progress> for InMemoryBookmarksRepository {
     // type Result = Result<(), ProgressBookmarkRepositoryError>;
-    type Result = ResponseActFuture<Self, (u64, u16), ProgressBookmarkRepositoryError>;
+    type Result = ResponseActFuture<Self, (u32, u16), ProgressBookmarkRepositoryError>;
     fn handle(&mut self, msg: Progress, _ctx: &mut Context<Self>) -> Self::Result {
         match msg {
             Progress {
@@ -394,19 +394,21 @@ impl Handler<Progress> for InMemoryBookmarksRepository {
                     match res {
                         Ok((user, book)) => match (user, book) {
                             (Some(user), Some(book)) => {
-                                let mut ret: (u64, u16);
+                                let mut ret: (u32, u16);
                                 if page_in_progress as i32 > book.page_count() {
                                     return fut::err(ProgressBookmarkRepositoryError::PageCountOverFlowError(
                                         page_in_progress,
                                         book.page_count(),
                                     ));
                                 }
+                                let mut ret: (u32, u16);
                                 if let Some(bookmark) = act
                                     .0
                                     .iter_mut()
                                     .find(|bookmark| bookmark.user_id == user.id && bookmark.book_id == book.id)
                                 {
-                                    bookmark.page_in_progress = page_in_progress
+                                    bookmark.page_in_progress = page_in_progress;
+                                    ret = (bookmark.id, page_in_progress);
                                 } else {
                                     let latest_bookmark = act.0.iter().max_by_key(|bookmark| bookmark.id);
                                     let bookmark = if let Some(latest_bookmark) = latest_bookmark {
@@ -424,10 +426,11 @@ impl Handler<Progress> for InMemoryBookmarksRepository {
                                             page_in_progress,
                                         }
                                     };
+                                    ret = (bookmark.id, page_in_progress);
                                     act.0.push(bookmark)
                                 }
                                 println!("{:?}", act.0);
-                                fut::ok((book.isbn().0, page_in_progress))
+                                fut::ok(ret)
                             }
                             // (None, _) => fut::err(()),
                             (None, _) => fut::err(ProgressBookmarkRepositoryError::UserNotFoundError),

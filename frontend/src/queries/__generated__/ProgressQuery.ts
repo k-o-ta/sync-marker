@@ -8,7 +8,7 @@
 
 export interface ProgressQuery_progress {
   __typename: "Progress";
-  isbn: string;
+  id: string;
   pageInProgress: number;
 }
 
