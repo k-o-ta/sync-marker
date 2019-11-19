@@ -26,12 +26,18 @@ const ProgressPopupAdd: React.FC = () => {
     );
   }
   const progressPopupContext = useContext(ProgressPopupContext);
-  const [pageCount, setPageCount] = useState(
+  const [pageCount, setPageCount] = useState<number | undefined>(
     progressPopupContext.status.pageCount
   );
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     e.preventDefault();
-    setPageCount(parseInt(e.target.value));
+    console.log();
+    const pageCount = parseInt(e.target.value);
+    if (!isNaN(pageCount)) {
+      setPageCount(pageCount);
+    } else if(e.target.value === '') {
+      setPageCount(undefined);
+    }
   }
   const popupStyle: { [key: string]: string } = {
     left: '50%',
@@ -67,12 +73,14 @@ const ProgressPopupAdd: React.FC = () => {
   // if (loading) return (<div>'Loading...'</div>);
   // if (error) return (<div>`Error! ${error.message}`</div>);
 
+  console.log("pageCount");
+  console.log(pageCount);
   return (
     <div style={popupStyle}>
       <form onSubmit={handleSubmit}>
         <label>
           progress:
-          <input type="text" value={pageCount} onChange={handleChange} />
+          <input type="text" value={pageCount || ""} onChange={handleChange} />
         </label>
         <button type="submit">Add</button>
       </form>
