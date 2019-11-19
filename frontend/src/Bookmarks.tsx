@@ -1,13 +1,13 @@
-import React, { useContext, useState } from "react";
-import { useQuery } from "@apollo/react-hooks";
-import { BookmarksQuery as TBookmarksQuery } from "./queries/__generated__/BookmarksQuery";
-import bookmarksQuery from "./queries/bookmarksQuery";
-import AddBookmarkPopup from "./AddBookmarkPopup";
+import React, { useContext, useState } from 'react';
+import { useQuery } from '@apollo/react-hooks';
+import { BookmarksQuery as TBookmarksQuery } from './queries/__generated__/BookmarksQuery';
+import bookmarksQuery from './queries/bookmarksQuery';
+import AddBookmarkPopup from './AddBookmarkPopup';
 import {
   ProgressPopupContext,
   ProgressPopupStatus
-} from "./progressPopup/progressPopupContext";
-import ProgressPopupAdd from "./progressPopup/ProgressPopupAdd";
+} from './progressPopup/progressPopupContext';
+import ProgressPopupAdd from './progressPopup/ProgressPopupAdd';
 
 const Bookmarks: React.FC = () => {
   const [progressState, setProgressState] = useState<{
@@ -33,12 +33,12 @@ const Bookmarks: React.FC = () => {
     progressPopupContext.setStatus(
       ProgressPopupStatus.add,
       e.currentTarget.dataset.bookmarkIsbn,
-      parseInt(e.currentTarget.dataset.pageCount || "0")
+      parseInt(e.currentTarget.dataset.pageCount || '0')
     );
     setProgressState({
       popup: ProgressPopupStatus.add,
       isbn: e.currentTarget.dataset.bookmarkIsbn,
-      pageCount: parseInt(e.currentTarget.dataset.bookmarkPageInProgress || "0")
+      pageCount: parseInt(e.currentTarget.dataset.bookmarkPageInProgress || '0')
     });
   }
 
@@ -53,7 +53,7 @@ const Bookmarks: React.FC = () => {
             isbn?: string,
             pageCount?: number
           ) => {
-            console.log("set");
+            console.log('set');
             setProgressState({ popup, isbn, pageCount });
           }
         }}
@@ -71,7 +71,7 @@ const Bookmarks: React.FC = () => {
             </li>
           ))}
         </ul>
-        {console.log("hoge")}
+        {console.log('hoge')}
         {console.log(progressState.popup)}
         {progressState.popup === ProgressPopupStatus.add && (
           <ProgressPopupAdd />

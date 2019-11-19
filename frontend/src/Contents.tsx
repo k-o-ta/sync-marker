@@ -12,7 +12,10 @@ import { LoggedInContext } from './LoggedInContext';
 // import {LoggedInContext} from "./App";
 //
 //
-const Contents: React.FC = () => {
+interface Prop {
+  loggedIn: boolean;
+}
+const Contents: React.FC<Prop> = prop => {
   const { loggedIn } = useContext(LoggedInContext);
   //   // const [loggedIn, setLoggedIn] = useState(false);
   //   const { loading, data } = useQuery<TLoggedInQuery>(
@@ -25,7 +28,7 @@ const Contents: React.FC = () => {
   return (
     <div>
       {console.log('contents: ', loggedIn)}
-      {loggedIn && <Bookmarks />}
+      {(prop.loggedIn || loggedIn) && <Bookmarks />}
     </div>
   );
 };

@@ -8,7 +8,10 @@ import CreateUser from './CreateUser';
 import Bookmarks from './Bookmarks';
 import bookmarksQuery from './queries/bookmarksQuery';
 import loggedInQuery from './queries/loggedInQuery';
-import { LoggedInQuery as TLoggedInQuery } from './queries/__generated__/LoggedInQuery';
+import {
+  LoggedInQuery,
+  LoggedInQuery as TLoggedInQuery
+} from './queries/__generated__/LoggedInQuery';
 import { LoggedInContext } from './LoggedInContext';
 import { useLoggedIn } from './LoggedInHook';
 import Signin from './Signin';
@@ -37,15 +40,11 @@ client
 
 // export const LoggedInContext = React.createContext(false);
 const App: React.FC = () => {
-  // const { loading, data } = useQuery<TLoggedInQuery>(
-  //     loggedInQuery,
-  //     {}
-  // );
-  // if (loading) return <p>Loading...</p>
-  // const [loggedIn, setLoggedInState] = React.useState(false);
-  // const loggedIn = useLoggedIn();
-  // console.log("loggedIn?", loggedIn.loggedIn);
+  const { loading, data } = useQuery<LoggedInQuery>(loggedInQuery, {
+    client: client
+  });
   const [loggedInState, setLoggedIn] = useState(false);
+  if (loading) return <div>Loading...</div>;
   return (
     <ApolloProvider client={client}>
       {/*<LoggedInContext.Provider value={{loggedIn: loggedIn, setLoggedIn: (loggedIn: boolean) => {*/}
@@ -55,8 +54,8 @@ const App: React.FC = () => {
       <LoggedInContext.Provider
         value={{ loggedIn: loggedInState, setLoggedIn: setLoggedIn }}
       >
-        <Signin></Signin>
-        <Contents />
+        <Signin loggedIn={(data || false) && data.loggedIn}></Signin>
+        <Contents loggedIn={(data || false) && data.loggedIn} />
         {/*<Login></Login>*/}
         {/*<CreateUser/>*/}
         <div className="App">
