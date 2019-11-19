@@ -6,8 +6,14 @@
 // GraphQL mutation operation: ProgressQuery
 // ====================================================
 
+export interface ProgressQuery_progress {
+  __typename: "Progress";
+  isbn: string;
+  pageInProgress: number;
+}
+
 export interface ProgressQuery {
-  progress: boolean;
+  progress: ProgressQuery_progress;
 }
 
 export interface ProgressQueryVariables {

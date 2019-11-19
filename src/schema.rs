@@ -1,4 +1,4 @@
-use super::bookmark::{Bookmark as TBookmark, InMemoryBookmarksRepository, Progress};
+use super::bookmark::{Bookmark as TBookmark, InMemoryBookmarksRepository, Progress as TProgress};
 use super::bookshelf::InMemoryBooksRepository;
 use super::bookshelf::Isbn as TIsbn;
 use super::bookshelf::{Book as TBook, BookInfo as TBookInfo};
@@ -212,6 +212,12 @@ pub enum BookmarksError {
     ActorError(MailboxError),
 }
 
+#[derive(GraphQLObject)]
+pub struct Progress {
+    isbn: String,
+    page_in_progress: i32,
+}
+
 pub struct Mutation;
 
 #[juniper::object(
@@ -286,7 +292,7 @@ impl Mutation {
         }
     }
 
-    fn progress(context: &Context, isbn: String, page_count: i32) -> FieldResult<bool> {
+    fn progress(context: &Context, isbn: String, page_count: i32) -> FieldResult<Progress> {
         dbg!("1");
         let isbn = TIsbn::try_from(isbn);
         let isbn = if let Ok(isbn) = isbn {
@@ -317,7 +323,7 @@ impl Mutation {
         };
 
         dbg!("4");
-        let res_future = context.bookmarks_repository_addr.send(Progress {
+        let res_future = context.bookmarks_repository_addr.send(TProgress {
             isbn,
             page_in_progress,
             session_digest,
@@ -329,7 +335,10 @@ impl Mutation {
         let res = res_future.wait();
         match res {
             Ok(res) => match res {
-                Ok(res) => Ok(true),
+                Ok(res) => Ok(Progress {
+                    isbn: res.0.to_string(),
+                    page_in_progress: res.1 as i32,
+                }),
                 Err(err) => {
                     return Err(FieldError::new(
                         "progress error",

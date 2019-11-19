@@ -16,6 +16,9 @@ export default gql`
 
 export const progressQuery = gql`
   mutation ProgressQuery($isbn: String!, $pageCount: Int!) {
-    progress(isbn: $isbn, pageCount: $pageCount)
+    progress(isbn: $isbn, pageCount: $pageCount) {
+      isbn
+      pageInProgress
+    }
   }
 `;

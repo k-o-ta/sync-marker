@@ -351,13 +351,13 @@ pub struct Progress {
 }
 
 impl Message for Progress {
-    type Result = Result<(), ProgressBookmarkRepositoryError>;
+    type Result = Result<(u64, u16), ProgressBookmarkRepositoryError>;
     // type Result = Result<BookAndLocation, ReqwestError>;
 }
 
 impl Handler<Progress> for InMemoryBookmarksRepository {
     // type Result = Result<(), ProgressBookmarkRepositoryError>;
-    type Result = ResponseActFuture<Self, (), ProgressBookmarkRepositoryError>;
+    type Result = ResponseActFuture<Self, (u64, u16), ProgressBookmarkRepositoryError>;
     fn handle(&mut self, msg: Progress, _ctx: &mut Context<Self>) -> Self::Result {
         match msg {
             Progress {
@@ -394,6 +394,7 @@ impl Handler<Progress> for InMemoryBookmarksRepository {
                     match res {
                         Ok((user, book)) => match (user, book) {
                             (Some(user), Some(book)) => {
+                                let mut ret: (u64, u16);
                                 if page_in_progress as i32 > book.page_count() {
                                     return fut::err(ProgressBookmarkRepositoryError::PageCountOverFlowError(
                                         page_in_progress,
@@ -426,7 +427,7 @@ impl Handler<Progress> for InMemoryBookmarksRepository {
                                     act.0.push(bookmark)
                                 }
                                 println!("{:?}", act.0);
-                                fut::ok(())
+                                fut::ok((book.isbn().0, page_in_progress))
                             }
                             // (None, _) => fut::err(()),
                             (None, _) => fut::err(ProgressBookmarkRepositoryError::UserNotFoundError),
