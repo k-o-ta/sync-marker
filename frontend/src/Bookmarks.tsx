@@ -5,10 +5,12 @@ import bookmarksQuery from './queries/bookmarksQuery';
 import AddBookmarkPopup from "./AddBookmarkPopup";
 import {ProgressPopupContext, ProgressPopupStatus} from "./progressPopup/progressPopupContext";
 import ProgressPopupAdd from "./progressPopup/ProgressPopupAdd";
+import {AddBookmarkPopupContext, AddBookmarkPopupStatus} from "./AddBookmarkPopupContext";
 
 
 const Bookmarks: React.FC = () => {
   const [progressState, setProgressState] = useState<{popup: ProgressPopupStatus, isbn?: string, pageCount?: number}>({popup: ProgressPopupStatus.hide, isbn: undefined, pageCount: undefined});
+  const [addBookmarkState, setAddBookmarkState] = useState<{popup: AddBookmarkPopupStatus, isbn?: string}>({popup: AddBookmarkPopupStatus.hide, isbn: ""});
   const progressPopupContext = useContext(ProgressPopupContext);
   const { loading, data, refetch } = useQuery<TBookmarksQuery>(
       bookmarksQuery,
@@ -43,7 +45,9 @@ const Bookmarks: React.FC = () => {
           {console.log(progressState.popup)}
           {(progressState.popup === ProgressPopupStatus.add) && <ProgressPopupAdd/>}
         </ProgressPopupContext.Provider>
-        <AddBookmarkPopup/>
+        <AddBookmarkPopupContext.Provider value={{status: addBookmarkState, setStatus: (popup: AddBookmarkPopupStatus, isbn?: string) => {setAddBookmarkState({popup, isbn})}}}>
+          <AddBookmarkPopup/>
+        </AddBookmarkPopupContext.Provider>
       </div>
   )
 };

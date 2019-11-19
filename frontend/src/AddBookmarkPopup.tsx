@@ -1,13 +1,14 @@
-import React, {useState} from 'react';
+import React, {useContext, useState} from 'react';
 import {AddBookmarkPopupContext, AddBookmarkPopupStatus} from "./AddBookmarkPopupContext";
 import AddBookmarkPopupSearch from "./AddBookmarkPopupSearch";
 import AddBookmarkPopupAdd from "./AddBookmarkPopupAdd";
 import AddBookmarkPopupHide from "./AddBookmarkPopupHide";
 
 const AddBookmarkPopup: React.FC = () => {
-  const [addBookmarkState, setAddBookmarkState] = useState<{popup: AddBookmarkPopupStatus, isbn?: string}>({popup: AddBookmarkPopupStatus.hide, isbn: ""});
+  // const [addBookmarkState, setAddBookmarkState] = useState<{popup: AddBookmarkPopupStatus, isbn?: string}>({popup: AddBookmarkPopupStatus.hide, isbn: ""});
+  const addBookmarkPopupContext = useContext(AddBookmarkPopupContext);
   let dom = (<AddBookmarkPopupHide/>);
-  switch (addBookmarkState.popup) {
+  switch (addBookmarkPopupContext.status.popup) {
     case AddBookmarkPopupStatus.hide:
       dom = <AddBookmarkPopupHide/>;
       console.log("hide");
@@ -22,9 +23,7 @@ const AddBookmarkPopup: React.FC = () => {
       break;
   }
   return (
-      <AddBookmarkPopupContext.Provider value={{status: addBookmarkState, setStatus: (popup: AddBookmarkPopupStatus, isbn?: string) => {setAddBookmarkState({popup, isbn})}}}>
-          {dom}
-      </AddBookmarkPopupContext.Provider>
+          dom
   )
 }
 export default AddBookmarkPopup;
