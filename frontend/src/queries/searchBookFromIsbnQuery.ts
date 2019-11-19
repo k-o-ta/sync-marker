@@ -1,14 +1,14 @@
-import {gql} from 'apollo-boost';
+import { gql } from 'apollo-boost';
 
 export default gql`
   query BookFromIsbnQuery($isbn: String!) {
-    bookFromIsbn(isbn: $isbn){
+    bookFromIsbn(isbn: $isbn) {
       name
       page
-      isbn{
+      isbn {
         code
       }
       dataSource
     }
   }
-`
+`;

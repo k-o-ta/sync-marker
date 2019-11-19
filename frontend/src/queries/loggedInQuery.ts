@@ -1,7 +1,7 @@
-import {gql} from 'apollo-boost';
+import { gql } from 'apollo-boost';
 
 export default gql`
-  query LoggedInQuery{
+  query LoggedInQuery {
     loggedIn
   }
-`
+`;
