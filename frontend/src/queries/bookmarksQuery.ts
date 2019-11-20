@@ -1,12 +1,12 @@
-import {gql} from 'apollo-boost';
+import { gql } from 'apollo-boost';
 
 export default gql`
-  query BookmarksQuery{
-    bookmarks{
+  query BookmarksQuery {
+    bookmarks {
       id
       title
       pageCount
-      isbn{
+      isbn {
         code
       }
       pageInProgress
